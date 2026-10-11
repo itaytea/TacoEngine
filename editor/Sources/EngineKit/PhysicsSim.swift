@@ -1,6 +1,6 @@
 import Foundation
 
-/// Mirrors the engine's vertical jump code (game/src/player.c) so the editor's graphs show
+/// Mirrors the engine's platformer code (engine/src/body.c) so the editor's graphs show
 /// the real arc, and solves designer-friendly targets ("this high, this fast") back into parameters.
 public enum PhysicsSim {
     public struct Arc {

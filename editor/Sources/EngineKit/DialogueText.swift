@@ -196,6 +196,28 @@ public struct DialogueChar: Equatable, Sendable {
 
 public enum DialogueText {
     public static let bold = 1, italic = 2, wave = 4, rainbow = 8, shake = 16
+    /// Room left for a {variable} when wrapping: 5 digits (up to 99999, or -9999)
+    public static let variableDigits = 5
+    /// Characters the engine lays out per page at most (MAX_CHARS in dialogue.c); more are cut off
+    public static let maxPageChars = 160
+
+    /// Characters per page as the engine counts them (letters, spaces, pauses, variable digits)
+    public static func pageCharCounts(_ bytes: [UInt8]) -> [Int] {
+        var counts = [0], i = 0
+        while i < bytes.count, bytes[i] != 0 {
+            let b = bytes[i]
+            switch b {
+            case 0x0C: counts.append(0)
+            case 0x06: i += 1
+            case 0x07: counts[counts.count - 1] += 1; i += 1
+            case 0x08: counts[counts.count - 1] += variableDigits; i += 1
+            case 0x20...: counts[counts.count - 1] += 1
+            default: break
+            }
+            i += 1
+        }
+        return counts
+    }
 
     enum Token {
         case char(UInt8, flags: Int, color: Int)
@@ -278,7 +300,7 @@ public enum DialogueText {
                 if case .page = toks[j] { break }
                 switch toks[j] {
                 case .char(let c, let f, _): w += adv(c, f)
-                case .variable(_, let f, _): w += 3 * adv(48, f)
+                case .variable(_, let f, _): w += variableDigits * adv(48, f)
                 default: break
                 }
                 word.append(toks[j])
@@ -293,7 +315,7 @@ public enum DialogueText {
                     x += adv(c, f)
                 case .variable(let v, let f, let col):
                     pages[pages.count - 1].append(DialogueChar(x: x, y: line * font.height, ch: 1, flags: f, color: col, pause: v))
-                    x += 3 * adv(48, f)
+                    x += variableDigits * adv(48, f)
                 case .pause(let n):
                     pages[pages.count - 1].append(DialogueChar(x: x, y: line * font.height, ch: 0, flags: 0, color: 0, pause: n))
                 default: break
@@ -324,7 +346,7 @@ public enum DialogueText {
                 flags = c.flags
                 if c.color != color { out += [0x06, UInt8(c.color)]; color = c.color }
                 let boldW = flags & bold != 0 ? 1 : 0
-                if c.ch == 1 { out += [0x08, UInt8(c.pause)]; x += 3 * (font.width(48) + boldW); continue }   // variable
+                if c.ch == 1 { out += [0x08, UInt8(c.pause)]; x += variableDigits * (font.width(48) + boldW); continue }   // variable
                 out.append(c.ch)
                 x += font.width(c.ch) + boldW
             }

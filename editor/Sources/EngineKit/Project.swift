@@ -22,6 +22,8 @@ public struct GameProject: Equatable, Sendable {
     public var textboxes: [UUID: Stored<TextBoxStyleAsset>] = [:]
     public var fonts: [UUID: Stored<FontAsset>] = [:]
     public var scripts: [ScriptInfo] = []
+    /// Asset files that couldn't be read, and files that share an id (shown in the Console; builds fail)
+    public var loadIssues: [String] = []
 
     public static let settingsFile = "project.json"
     public var assetsDir: URL { root.appendingPathComponent("assets") }
@@ -43,28 +45,62 @@ public struct GameProject: Equatable, Sendable {
         let data = try Data(contentsOf: root.appendingPathComponent(settingsFile))
         var p = GameProject(root: root, settings: try JSONDecoder().decode(ProjectSettings.self, from: data))
         let dec = JSONDecoder()
-        for url in p.assetFiles() {
-            guard let kind = AssetKind.of(url), let d = try? Data(contentsOf: url) else { continue }
-            let rel = p.relative(url)
-            switch kind {
-            case .sprite: if let a = try? dec.decode(SpriteAsset.self, from: d) { p.sprites[a.guid] = Stored(path: rel, value: a) }
-            case .tileset: if let a = try? dec.decode(TilesetAsset.self, from: d) { p.tilesets[a.guid] = Stored(path: rel, value: a) }
-            case .prefab: if let a = try? dec.decode(PrefabAsset.self, from: d) { p.prefabs[a.guid] = Stored(path: rel, value: a) }
-            case .scene: if let a = try? dec.decode(SceneAsset.self, from: d) { p.scenes[a.guid] = Stored(path: rel, value: a) }
-            case .platformer: if let a = try? dec.decode(PlatformerSettings.self, from: d) { p.platformers[a.guid] = Stored(path: rel, value: a) }
-            case .dialogue: if let a = try? dec.decode(DialogueAsset.self, from: d) { p.dialogues[a.guid] = Stored(path: rel, value: a) }
-            case .speaker: if let a = try? dec.decode(SpeakerAsset.self, from: d) { p.speakers[a.guid] = Stored(path: rel, value: a) }
-            case .textbox: if let a = try? dec.decode(TextBoxStyleAsset.self, from: d) { p.textboxes[a.guid] = Stored(path: rel, value: a) }
-            case .font: if let a = try? dec.decode(FontAsset.self, from: d) { p.fonts[a.guid] = Stored(path: rel, value: a) }
+        var issues: [String] = []
+        @discardableResult
+        func add<T: Decodable & Equatable & Sendable>(_ type: T.Type, _ d: Data, _ rel: String, _ map: inout [UUID: Stored<T>], _ guid: (T) -> UUID) -> Bool {
+            do {
+                let a = try dec.decode(type, from: d)
+                if let other = map[guid(a)] {
+                    issues.append("\(rel) and \(other.path) have the same id (one is probably a copy made in Finder). Delete one, or duplicate assets inside the editor instead.")
+                    return true
+                }
+                map[guid(a)] = Stored(path: rel, value: a)
+                return true
+            } catch {
+                issues.append("\(rel) couldn't be read: \(GameProject.describe(error)). Fix the file (a leftover merge conflict?) or restore it from git.")
+                return false
             }
         }
+        var sceneUnreadable = false
+        for url in p.assetFiles() {
+            guard let kind = AssetKind.of(url) else { continue }
+            let rel = p.relative(url)
+            guard let d = try? Data(contentsOf: url) else {
+                issues.append("\(rel) couldn't be opened.")
+                if kind == .scene { sceneUnreadable = true }
+                continue
+            }
+            switch kind {
+            case .sprite: add(SpriteAsset.self, d, rel, &p.sprites) { $0.guid }
+            case .tileset: add(TilesetAsset.self, d, rel, &p.tilesets) { $0.guid }
+            case .prefab: add(PrefabAsset.self, d, rel, &p.prefabs) { $0.guid }
+            case .scene: if !add(SceneAsset.self, d, rel, &p.scenes, { $0.guid }) { sceneUnreadable = true }
+            case .platformer: add(PlatformerSettings.self, d, rel, &p.platformers) { $0.guid }
+            case .dialogue: add(DialogueAsset.self, d, rel, &p.dialogues) { $0.guid }
+            case .speaker: add(SpeakerAsset.self, d, rel, &p.speakers) { $0.guid }
+            case .textbox: add(TextBoxStyleAsset.self, d, rel, &p.textboxes) { $0.guid }
+            case .font: add(FontAsset.self, d, rel, &p.fonts) { $0.guid }
+            }
+        }
+        p.loadIssues = issues
         p.reloadScripts()
-        // Keep the build order in sync with the scenes on disk
-        p.settings.scenes = p.settings.scenes.filter { p.scenes[$0] != nil }
+        // Keep the build order in sync with the scenes on disk. While a scene file can't be read, its place
+        // in the order is kept, so scene numbers (and saved games) don't shift.
+        if !sceneUnreadable { p.settings.scenes = p.settings.scenes.filter { p.scenes[$0] != nil } }
         for id in p.scenes.keys.sorted(by: { p.scenes[$0]!.path < p.scenes[$1]!.path }) where !p.settings.scenes.contains(id) {
             p.settings.scenes.append(id)
         }
         return p
+    }
+
+    static func describe(_ error: Error) -> String {
+        switch error {
+        case DecodingError.dataCorrupted(let c): return "not valid JSON (\(c.debugDescription))"
+        case DecodingError.keyNotFound(let k, _): return "missing \"\(k.stringValue)\""
+        case DecodingError.typeMismatch(_, let c), DecodingError.valueNotFound(_, let c):
+            return "wrong value at \(c.codingPath.map(\.stringValue).joined(separator: "."))"
+        default: return error.localizedDescription
+        }
     }
 
     public mutating func reloadScripts() {
@@ -84,17 +120,24 @@ public struct GameProject: Equatable, Sendable {
     public static let imageExtensions: Set<String> = ["png", "gif", "jpg", "jpeg", "bmp"]
     public static let audioExtensions: Set<String> = ["wav", "wave", "aif", "aiff", "mp3", "m4a", "aac", "caf", "flac"]
 
-    /// Every audio file under assets/ is a sound, named after its file (the first one wins if two share a name)
+    /// Every audio file under assets/ is a sound, named after its file (the first one wins if two share a
+    /// name; builds report the clash)
     public func sounds() -> [(name: String, path: String)] {
+        var seen = Set<String>()
+        return allSounds().filter { seen.insert($0.name).inserted }
+    }
+
+    /// All audio files under assets/, including ones whose names clash
+    public func allSounds() -> [(name: String, path: String)] {
         guard let e = FileManager.default.enumerator(at: assetsDir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { return [] }
-        var seen = Set<String>(), out: [(name: String, path: String)] = []
+        var out: [(name: String, path: String)] = []
         for case let u as URL in e where GameProject.audioExtensions.contains(u.pathExtension.lowercased()) {
             let rel = relative(u)
             let name = u.deletingPathExtension().lastPathComponent
             out.append((name, rel))
         }
         out.sort { $0.path < $1.path }
-        return out.filter { seen.insert($0.name).inserted }
+        return out
     }
 
     /// Images under assets/ that no sprite or tileset uses yet (relative paths) — e.g. files dropped in from Finder
@@ -163,8 +206,9 @@ public struct GameProject: Equatable, Sendable {
         if old?.settings != settings { try saveSettings() }
         func sync<T: Codable & Equatable & Sendable>(_ mine: [UUID: Stored<T>], _ theirs: [UUID: Stored<T>]?) throws {
             for (id, s) in mine where theirs?[id] != s {
-                if let prev = theirs?[id], prev.path != s.path { try? FileManager.default.removeItem(at: url(prev.path)) }
+                // Write the new file before removing the old one (a rename), so a failed write loses nothing
                 try save(s.value, path: s.path)
+                if let prev = theirs?[id], prev.path != s.path { try? FileManager.default.removeItem(at: url(prev.path)) }
             }
             for (id, s) in theirs ?? [:] where mine[id] == nil { try? FileManager.default.removeItem(at: url(s.path)) }
         }

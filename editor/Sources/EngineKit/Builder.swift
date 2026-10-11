@@ -8,6 +8,10 @@ public struct Diagnostic: Equatable, Sendable, Identifiable, Hashable {
     public var line: Int?
     public var column: Int?
     public var message: String
+
+    public init(severity: Severity, file: String? = nil, line: Int? = nil, column: Int? = nil, message: String) {
+        self.severity = severity; self.file = file; self.line = line; self.column = column; self.message = message
+    }
 }
 
 public struct BuildResult: Sendable {
@@ -154,6 +158,7 @@ public enum Builder {
         log += oout
         guard os == 0 else { return fail("objcopy failed") }
         do { try fixHeader(rom, title: p.settings.romTitle) } catch { return fail("Couldn't finalize the ROM: \(error.localizedDescription)") }
+        addNintendoLogo(rom)
         let size = (try? fm.attributesOfItem(atPath: rom.path)[.size] as? Int) ?? 0
         log += "Built \(rom.lastPathComponent) (\(size / 1024) KB)\n"
         return BuildResult(success: true, log: log, diagnostics: diags, rom: rom)
@@ -202,6 +207,25 @@ public enum Builder {
     }
 
     /// GBA header: title, game code, fixed byte, complement check
+    /// devkitPro's gbafix (package gba-tools), if installed
+    public static var gbafix: String? {
+        let path = devkitPro + "/tools/bin/gbafix"
+        return FileManager.default.isExecutableFile(atPath: path) ? path : nil
+    }
+
+    /// Real GBAs only boot a ROM whose header holds Nintendo's logo. TacoEngine doesn't ship that data;
+    /// devkitPro's gbafix writes it (and fixes the checksum again). Emulators don't need it.
+    static func addNintendoLogo(_ rom: URL) {
+        guard let tool = gbafix else { return }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: tool)
+        p.arguments = [rom.path]
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        try? p.run()
+        p.waitUntilExit()
+    }
+
     static func fixHeader(_ url: URL, title: String) throws {
         var rom = [UInt8](try Data(contentsOf: url))
         if rom.count < 0xC0 { rom += [UInt8](repeating: 0, count: 0xC0 - rom.count) }
@@ -220,20 +244,29 @@ public enum Builder {
     /// (with audio sync on, a big buffer lets the emulator run ahead of the screen and makes input feel late).
     static let mgbaOptions = ["autoload=0", "autosave=0", "fpsTarget=59.7275", "audioBuffers=1024", "frameskip=0"]
 
-    /// Opens the ROM in mGBA if installed (replacing a game it's already running), otherwise the default app.
     /// mGBA's location, if it's installed
     public static var mgbaApp: String? {
         ["/Applications/mGBA.app", NSHomeDirectory() + "/Applications/mGBA.app"].first { FileManager.default.fileExists(atPath: $0) }
     }
 
+    /// The mGBA that the last Play started (only that one is closed by the next Play)
+    nonisolated(unsafe) private static var launched: Process?
+
+    /// Opens the ROM in mGBA if it's installed, replacing the game a previous Play opened (any other
+    /// mGBA window is left alone); otherwise in the default app for .gba files.
     public static func launch(_ rom: URL) {
+        guard let app = mgbaApp else { NSWorkspace.shared.open(rom); return }
+        if let old = launched, old.isRunning { old.terminate() }
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        let mgba = mgbaApp
-        if mgba != nil {
-            for app in NSWorkspace.shared.runningApplications where app.bundleIdentifier == "com.endrift.mgba-qt" { app.terminate() }
+        p.executableURL = URL(fileURLWithPath: app).appendingPathComponent("Contents/MacOS/mGBA")
+        p.arguments = mgbaOptions.flatMap { ["-C", $0] } + [rom.path]
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { NSWorkspace.shared.open(rom); return }
+        launched = p
+        // Started as a plain process, so bring its window to the front once it's up
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            NSRunningApplication(processIdentifier: p.processIdentifier)?.activate()
         }
-        p.arguments = mgba.map { ["-n", "-a", $0, "--args"] + mgbaOptions.flatMap { ["-C", $0] } + [rom.path] } ?? [rom.path]
-        try? p.run()
     }
 }

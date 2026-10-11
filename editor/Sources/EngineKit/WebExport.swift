@@ -1,16 +1,15 @@
 import Foundation
 
-/// Export a game as a web page: index.html + game.gba, played in the browser with EmulatorJS
-/// (an open-source emulator; its mGBA core is loaded from the EmulatorJS CDN). Upload the folder
-/// to itch.io (as an HTML game, zipped) or any web host. Saves are kept in the player's browser.
+/// Export a game as a web page: index.html + game.gba, played in the browser with EmulatorJS (an
+/// open-source emulator with an mGBA core), whose files are copied into emulatorjs/ next to the game.
+/// Upload the folder to itch.io (as an HTML game, zipped) or any web host. Saves stay in the browser.
 public enum WebExport {
     public struct ExportError: LocalizedError {
         public let message: String
         public var errorDescription: String? { message }
     }
 
-    /// The EmulatorJS release the page loads (pinned, so a CDN update can't break exported games)
-    public static let emulatorVersion = "4.2.3"
+    public static var emulatorVersion: String { EmulatorJS.version }
 
     /// Build from the start scene (with the title menu, if any) and write the web folder
     public static func export(_ p: GameProject, to folder: URL, progress: ((String) -> Void)? = nil) -> BuildResult {
@@ -23,8 +22,18 @@ public enum WebExport {
             let dest = folder.appendingPathComponent("game.gba")
             try? fm.removeItem(at: dest)
             try fm.copyItem(at: rom, to: dest)
-            try page(title: p.settings.name).write(to: folder.appendingPathComponent("index.html"), atomically: true, encoding: .utf8)
-            try readme(title: p.settings.name).write(to: folder.appendingPathComponent("README.txt"), atomically: true, encoding: .utf8)
+            // The emulator goes next to the game; if it can't be downloaded (offline, first export), the
+            // page loads it from the EmulatorJS servers instead
+            var bundled = true
+            do {
+                try EmulatorJS.copy(to: folder.appendingPathComponent("emulatorjs"), progress: progress)
+            } catch {
+                bundled = false
+                try? fm.removeItem(at: folder.appendingPathComponent("emulatorjs"))
+                result.diagnostics.append(Diagnostic(severity: .warning, message: "\(error.localizedDescription) This export loads EmulatorJS from its servers instead, so players need internet. Export again when you're online to include it."))
+            }
+            try page(title: p.settings.name, bundled: bundled).write(to: folder.appendingPathComponent("index.html"), atomically: true, encoding: .utf8)
+            try readme(title: p.settings.name, bundled: bundled).write(to: folder.appendingPathComponent("README.txt"), atomically: true, encoding: .utf8)
         } catch {
             result.success = false
             result.diagnostics.append(Diagnostic(severity: .error, message: "Couldn't write the web export: \(error.localizedDescription)"))
@@ -44,8 +53,8 @@ public enum WebExport {
 
     /// Only the game: it fills the page (or the iframe it's embedded in), letterboxed to 3:2.
     /// EmulatorJS shows its own start button, which also lets the browser play sound.
-    static func page(title: String) -> String {
-        let data = "https://cdn.emulatorjs.org/\(emulatorVersion)/data/"
+    static func page(title: String, bundled: Bool) -> String {
+        let data = bundled ? "emulatorjs/" : EmulatorJS.cdn
         return """
         <!doctype html>
         <html lang="en">
@@ -72,6 +81,9 @@ public enum WebExport {
             window.EJS_gameUrl = "game.gba";
             window.EJS_gameName = "\(js(title))";
             window.EJS_pathtodata = "\(data)";
+            window.EJS_forceLegacyCores = true;    // always the same core file (the one shipped in emulatorjs/)
+            window.EJS_language = "en-US";
+            window.EJS_disableAutoLang = true;
             var script = document.createElement("script");
             script.src = "\(data)loader.js";
             script.onerror = function () {
@@ -86,13 +98,23 @@ public enum WebExport {
         """
     }
 
-    static func readme(title: String) -> String {
-        """
+    static func readme(title: String, bundled: Bool) -> String {
+        let emulator = bundled
+            ? """
+              The game runs in EmulatorJS \(emulatorVersion) (https://emulatorjs.org), included in emulatorjs/ under
+              the GPL-3.0 license (emulatorjs/LICENSE). Its source is at https://github.com/EmulatorJS/EmulatorJS.
+              Nothing is loaded from other servers, so the game also works offline.
+              """
+            : """
+              The page loads EmulatorJS \(emulatorVersion) (GPL-3.0, https://emulatorjs.org) from the EmulatorJS
+              servers, so players need an internet connection. Export again while online to include it instead.
+              """
+        return """
         \(title): web version
 
           index.html   the game, filling the page or the frame it's embedded in
           game.gba     the ROM
-
+        \(bundled ? "  emulatorjs/  the emulator (keep it next to index.html)\n" : "")
         itch.io
           Zip this folder and upload it as an HTML game. Tick "This file will be played in the browser"
           and set the viewport to 720 x 480 (or any 3:2 size, e.g. 960 x 640). Optionally tick
@@ -111,8 +133,7 @@ public enum WebExport {
         Enter = Start, V = Select, Q / E = L / R. Gamepads work, and touch screens get on-screen buttons.
         Saves stay in the player's browser.
 
-        The page loads EmulatorJS \(emulatorVersion) (GPL-3.0, https://emulatorjs.org) and its mGBA core from the
-        EmulatorJS servers, so players need an internet connection.
+        \(emulator)
 
         """
     }

@@ -31,12 +31,70 @@ public enum Codegen {
         objSizes.filter { $0.0 >= w && $0.1 >= h }.min { $0.0 * $0.1 < $1.0 * $1.1 }
     }
 
-    public static func generate(_ p: GameProject, boot: Boot = .start, sounds: [SoundConverter.Converted] = []) throws -> Output {
-        var warnings: [String] = []
+    static let maxEntities = 96   // MAX_ENTITIES in engine.h
+    static let maxBodies = 8      // MAX_BODIES in body.c
+
+    /// Problems found before any C is written: unreadable files, names that turn into the same C
+    /// identifier, and engine limits. Errors stop the build; warnings are shown in the Console.
+    public static func validate(_ p: GameProject) -> (errors: [String], warnings: [String]) {
+        var errors = p.loadIssues, warnings: [String] = []
         let s = p.settings
-        guard !s.scenes.isEmpty else { throw GenError(message: "The project has no scenes. Create one in the Project panel.") }
-        guard s.tileFlags.count <= 8 else { throw GenError(message: "At most 8 tile flags are supported.") }
-        guard s.variables.count <= 64 else { throw GenError(message: "At most 64 variables are supported.") }
+        if s.scenes.isEmpty { errors.append("The project has no scenes. Create one in the Project panel.") }
+        if s.scenes.contains(where: { p.scenes[$0] == nil }) {
+            errors.append("A scene in the build order couldn't be read, so scene numbers would shift. Fix the scene file listed above first.")
+        }
+        if s.tileFlags.count > 8 { errors.append("At most 8 tile flags are supported (this project has \(s.tileFlags.count)).") }
+        if s.variables.count > 64 { errors.append("At most 64 variables are supported (this project has \(s.variables.count)).") }
+
+        // Names that become the same C symbol would clash (or shadow each other) in the generated code
+        func clashes(_ kind: String, _ prefix: String, _ names: [String], reserved: [String] = []) {
+            let groups = Dictionary(grouping: names + reserved, by: { prefix + cIdentifier($0) })
+            for (sym, ns) in groups.sorted(by: { $0.key < $1.key }) where ns.count > 1 {
+                let listed = ns.filter { !reserved.contains($0) }.map { "\"\($0)\"" }.joined(separator: ", ")
+                errors.append(ns.contains(where: reserved.contains)
+                              ? "The \(kind) name \(listed) is reserved (it becomes \(sym)). Rename it."
+                              : "These \(kind)s all become \(sym) in code: \(listed). Rename all but one.")
+            }
+        }
+        clashes("prefab", "PREFAB_", p.prefabs.values.map(\.name))
+        clashes("sprite", "SPRITE_", p.sprites.values.map(\.name))
+        clashes("dialogue", "DIALOGUE_", p.dialogues.values.map(\.name))
+        clashes("platformer settings", "PLATFORMER_", p.platformers.values.map(\.name))
+        clashes("tileset", "TILESET_", p.tilesets.values.map(\.name))
+        clashes("speaker", "SPEAKER_", p.speakers.values.map(\.name))
+        clashes("text box style", "TEXTBOX_", p.textboxes.values.map(\.name), reserved: ["_default"])
+        clashes("scene", "SCENE_", s.scenes.compactMap { p.scenes[$0]?.name })
+        clashes("tag", "TAG_", s.tags, reserved: ["Untagged"])
+        clashes("variable", "VAR_", s.variables, reserved: ["COUNT"])
+        clashes("tile flag", "TILEFLAG_", s.tileFlags, reserved: ["NONE"])
+        let soundGroups = Dictionary(grouping: p.allSounds(), by: { cIdentifier($0.name) })
+        for (sym, ss) in soundGroups.sorted(by: { $0.key < $1.key }) where ss.count > 1 {
+            errors.append("These sounds all become SOUND_\(sym) in code: \(ss.map(\.path).joined(separator: ", ")). Rename all but one.")
+        }
+        for (name, ss) in Dictionary(grouping: p.scripts, by: \.name).sorted(by: { $0.key < $1.key }) where ss.count > 1 {
+            errors.append("SCRIPT(\(name)) is declared more than once: \(ss.map { p.relative($0.file) }.joined(separator: ", ")).")
+        }
+
+        // Engine limits that would otherwise fail quietly at runtime
+        for id in s.scenes {
+            guard let sc = p.scenes[id] else { continue }
+            let count = sc.value.entities.count
+            if count > maxEntities {
+                errors.append("Scene \(sc.name) has \(count) entities; the engine holds \(maxEntities) at once. Remove some, or spawn them later from a script.")
+            }
+            let bodies = sc.value.entities.filter { p.effectiveDef($0).platformer != nil }.count
+            if bodies > maxBodies {
+                warnings.append("Scene \(sc.name) has \(bodies) entities with a Platformer Body; only \(maxBodies) can move at once, the rest stay still.")
+            }
+        }
+        return (errors, warnings)
+    }
+
+    public static func generate(_ p: GameProject, boot: Boot = .start, sounds: [SoundConverter.Converted] = []) throws -> Output {
+        let check = validate(p)
+        if !check.errors.isEmpty { throw GenError(message: check.errors.joined(separator: "\n")) }
+        var warnings = check.warnings
+        let s = p.settings
 
         // Stable symbol names
         func sym(_ prefix: String, _ name: String) -> String { prefix + cIdentifier(name) }
@@ -48,13 +106,7 @@ public enum Codegen {
         var soundSym: [String: String] = [:]          // sound name -> symbol
         for snd in sounds { soundSym[snd.name] = sym("SOUND_", snd.name) }
         func soundRef(_ name: String?) -> String { name.flatMap { soundSym[$0] }.map { "&\($0)" } ?? "0" }
-        for (kind, syms) in [("prefab", prefabSym), ("sprite", spriteSym)] {
-            let dupes = Dictionary(grouping: syms.values, by: { $0 }).filter { $0.value.count > 1 }.keys
-            if let d = dupes.first { throw GenError(message: "Two \(kind)s share the name \(d) — rename one.") }
-        }
         let scripts = p.scripts
-        let scriptNames = Dictionary(grouping: scripts, by: \.name).filter { $0.value.count > 1 }.keys
-        if let d = scriptNames.first { throw GenError(message: "SCRIPT(\(d)) is declared more than once.") }
 
         // ---------------- script_types.h ----------------
         var h = CWriter()
@@ -458,6 +510,9 @@ public enum Codegen {
                 let speaker = l.speaker.flatMap { p.speakers[$0]?.value }
                 let width = geo.textWidth(portraitWidth: portraitWidth(speaker, in: p))
                 let bytes = DialogueText.bytes(l.text, font: f, width: width, lines: st.lines, variables: p.settings.variables)
+                for (pi, n) in DialogueText.pageCharCounts(bytes).enumerated() where n > DialogueText.maxPageChars {
+                    warnings.append("Dialogue \(d.name), line \(i + 1): page \(pi + 1) has \(n) characters, but a page shows \(DialogueText.maxPageChars); the rest is cut off. Add a [page] break or use fewer lines per page.")
+                }
                 c.line("static const u8 \(name)_t\(i)[] = { \(bytes.map(String.init).joined(separator: ",")) };")
                 var talk = 0, idle = 0
                 if let sp = speaker, let pid = sp.portrait, let anims = p.sprites[pid]?.value.animations {

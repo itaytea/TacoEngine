@@ -106,9 +106,25 @@ public enum ScriptParser {
     static let fieldRegex = try! NSRegularExpression(
         pattern: #"^\s*((?:const\s+)?[A-Za-z_][\w]*(?:\s+[A-Za-z_]\w*)*?)\s*(\*+)?\s*([A-Za-z_]\w*)\s*(\[[^\]]*\])?\s*;\s*(?://(.*))?$"#)
 
+    /// "int a, b;  // = 3 Help" declares two fields; each gets the comment
+    static let multiRegex = try! NSRegularExpression(
+        pattern: #"^\s*((?:const\s+)?[A-Za-z_]\w*(?:\s+[A-Za-z_]\w*)*?)\s+((?:\**\s*[A-Za-z_]\w*\s*(?:\[[^\]]*\])?\s*,\s*)+\**\s*[A-Za-z_]\w*\s*(?:\[[^\]]*\])?)\s*;\s*(//.*)?$"#)
+
+    static func expandDeclarations(_ body: String) -> [String] {
+        body.components(separatedBy: "\n").flatMap { raw -> [String] in
+            let ns = raw as NSString
+            guard let m = multiRegex.firstMatch(in: raw, range: NSRange(location: 0, length: ns.length)) else { return [raw] }
+            let type = ns.substring(with: m.range(at: 1))
+            let comment = m.range(at: 3).location != NSNotFound ? " " + ns.substring(with: m.range(at: 3)) : ""
+            return ns.substring(with: m.range(at: 2)).split(separator: ",").map {
+                "\(type) \($0.trimmingCharacters(in: .whitespaces));\(comment)"
+            }
+        }
+    }
+
     static func parseFields(_ body: String) -> [ScriptField] {
         var fields: [ScriptField] = []
-        for raw in body.components(separatedBy: "\n") {
+        for raw in expandDeclarations(body) {
             let ns = raw as NSString
             guard let m = fieldRegex.firstMatch(in: raw, range: NSRange(location: 0, length: ns.length)) else { continue }
             let ctype = ns.substring(with: m.range(at: 1)).trimmingCharacters(in: .whitespaces)

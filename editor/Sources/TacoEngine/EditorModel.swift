@@ -118,10 +118,8 @@ final class EditorModel: ObservableObject {
         guard saveTask == nil || saveTask!.isCancelled, let disk = try? GameProject.load(project.root) else { return }
         var mine = lastSaved ?? project
         mine.scripts = disk.scripts
-        if disk.sprites != mine.sprites || disk.tilesets != mine.tilesets || disk.prefabs != mine.prefabs
-            || disk.scenes != mine.scenes || disk.platformers != mine.platformers || disk.settings != mine.settings {
-            reload()
-        }
+        // Every asset kind counts (a git pull can change dialogues, speakers, text boxes or fonts too)
+        if disk != mine { reload() }
     }
 
     // MARK: Loose files
@@ -284,6 +282,7 @@ final class EditorModel: ObservableObject {
             center = .scene
             stampScripts()
             refreshFolders()
+            showLoadIssues(p)
             UserDefaults.standard.set(url.path, forKey: Self.lastProjectKey)
             addRecent(url)
             startWatching(url)
@@ -393,9 +392,9 @@ final class EditorModel: ObservableObject {
     }
 
     private func stampScripts() {
-        guard let dir = project?.scriptsDir else { return }
-        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-        scriptStamp = Dictionary(uniqueKeysWithValues: files.filter { $0.pathExtension == "c" }.map {
+        // Every script the project reads: scripts/ and assets/, at any folder depth
+        let files = project?.scriptFiles() ?? []
+        scriptStamp = Dictionary(uniqueKeysWithValues: files.map {
             ($0.path, (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)
         })
     }
@@ -1119,6 +1118,15 @@ final class EditorModel: ObservableObject {
         artVersion += 1
         stampScripts()
         refreshFolders()
+        showLoadIssues(p)
+    }
+
+    /// Files that couldn't be read go to the Console as errors (builds refuse to run until they're fixed)
+    func showLoadIssues(_ p: GameProject) {
+        diagnostics.removeAll { $0.file == nil && $0.message.hasPrefix("Project: ") }
+        guard !p.loadIssues.isEmpty else { return }
+        diagnostics.insert(contentsOf: p.loadIssues.map { Diagnostic(severity: .error, message: "Project: " + $0) }, at: 0)
+        bottomTab = 1
     }
 
     private func ask(_ title: String, _ message: String, _ initial: String, button: String) -> String? {

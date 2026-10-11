@@ -302,7 +302,9 @@ struct DefEditor: View {
     }
 
     @ViewBuilder func fieldRow(_ f: ScriptField, scriptIndex i: Int) -> some View {
-        let isOver = over("scripts", String(i), "fields", f.name)
+        // Overrides of a script are keyed by its name ("@Name"); older projects used its position
+        let scriptKey = def.scripts.indices.contains(i) ? "@" + def.scripts[i].script : String(i)
+        let isOver = over("scripts", scriptKey, "fields", f.name) || over("scripts", String(i), "fields", f.name)
         let value = Binding<JSON?>(
             get: { def.scripts.indices.contains(i) ? (def.scripts[i].fields[f.name] ?? f.defaultValue) : nil },
             set: { v in if def.scripts.indices.contains(i) { def.scripts[i].fields[f.name] = v } })

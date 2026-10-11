@@ -12,5 +12,8 @@ let package = Package(
         .target(name: "EngineKit"),
         .executableTarget(name: "TacoEngine", dependencies: ["EngineKit"]),
         .executableTarget(name: "gbaexport", dependencies: ["EngineKit"]),
+        // Tests as a plain executable, so they run with the command line tools alone: swift run enginekit-tests
+        .executableTarget(name: "enginekit-tests", dependencies: ["EngineKit"], path: "Tests/EngineKitTests",
+                          exclude: ["Fixtures"]),
     ]
 )

@@ -36,15 +36,30 @@ public enum JSON: Codable, Equatable, Hashable, Sendable {
     public var string: String? { if case .string(let s) = self { return s }; return nil }
     public var object: [String: JSON]? { if case .object(let o) = self { return o }; return nil }
 
-    /// Apply `patch` on top of self. Objects merge recursively; an object patch on an array patches by index.
+    /// Names of an array of script components ({"script": name, ...}), if every element has a distinct one.
+    /// Such arrays are patched by name ("@Name"), so reordering or removing scripts in a prefab can't move
+    /// an instance's values onto a different script.
+    static func scriptNames(_ a: [JSON]) -> [String]? {
+        let names = a.compactMap { $0.object?["script"]?.string }
+        guard !names.isEmpty, names.count == a.count, Set(names).count == names.count else { return nil }
+        return names
+    }
+
+    /// Apply `patch` on top of self. Objects merge recursively; an object patch on an array patches by
+    /// script name ("@Name") or by index (numeric keys, from older projects).
     public func merged(with patch: JSON) -> JSON {
         switch (self, patch) {
         case (.object(var base), .object(let p)):
             for (k, v) in p { base[k] = (base[k] ?? .null).merged(with: v) }
             return .object(base)
         case (.array(var base), .object(let p)):
+            let names = JSON.scriptNames(base)
             for (k, v) in p {
-                if let i = Int(k), i >= 0, i < base.count { base[i] = base[i].merged(with: v) }
+                if k.hasPrefix("@") {
+                    if let i = names?.firstIndex(of: String(k.dropFirst())) { base[i] = base[i].merged(with: v) }
+                } else if let i = Int(k), i >= 0, i < base.count {
+                    base[i] = base[i].merged(with: v)
+                }
             }
             return .array(base)
         default:
@@ -62,7 +77,17 @@ public enum JSON: Codable, Equatable, Hashable, Sendable {
                 if let b = theirs[k] { if let d = v.diff(from: b) { out[k] = d } } else { out[k] = v }
             }
             return out.isEmpty ? nil : .object(out)
-        case (.array(let mine), .array(let theirs)) where mine.count == theirs.count:
+        case (.array(let mine), .array(let theirs)):
+            if let a = JSON.scriptNames(mine), let b = JSON.scriptNames(theirs), Set(a) == Set(b) {
+                var out: [String: JSON] = [:]
+                for (i, name) in a.enumerated() {
+                    if let d = mine[i].diff(from: theirs[b.firstIndex(of: name)!]) { out["@" + name] = d }
+                }
+                // Same scripts in a different order: the instance's order has to be kept as a whole
+                if a != b { return self }
+                return out.isEmpty ? nil : .object(out)
+            }
+            guard mine.count == theirs.count else { return self }
             var out: [String: JSON] = [:]
             for i in mine.indices { if let d = mine[i].diff(from: theirs[i]) { out[String(i)] = d } }
             return out.isEmpty ? nil : .object(out)

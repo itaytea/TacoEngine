@@ -376,8 +376,9 @@ public struct SceneAsset: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         guid = try c.decode(UUID.self, forKey: .guid)
-        width = try c.decode(Int.self, forKey: .width)
-        height = try c.decode(Int.self, forKey: .height)
+        // Clamped like resize(): the engine's map holds 256x256 cells
+        width = max(1, min(256, try c.decode(Int.self, forKey: .width)))
+        height = max(1, min(256, try c.decode(Int.self, forKey: .height)))
         tileset = try c.decodeIfPresent(UUID.self, forKey: .tileset)
         background = try c.decodeIfPresent(String.self, forKey: .background) ?? "#000000"
         cameraMode = try c.decodeIfPresent(CameraMode.self, forKey: .cameraMode) ?? .follow
