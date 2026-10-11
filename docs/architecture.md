@@ -43,7 +43,7 @@ docs/                  user documentation and this page
 
 At boot `main()` sets `REG_WAITCNT` to the fast cartridge timing (3/1 wait states with prefetch). Then every frame:
 
-1. `vsync()` (busy-waits on `REG_VCOUNT`)
+1. `vsync()`: sleeps in the BIOS (`VBlankIntrWait`) until the vblank interrupt, set up by `irq_init()`
 2. In vblank: `sound_commit()` (points DMA1 at the buffer mixed last frame), `entities_commit()` (OAM + sprite frame DMA), `dialogue_commit()`, `draw_commit()`, `background_commit()` (scroll and colors), `tilemap_draw()` (stream new map columns/rows)
 3. `read_input()`: `input_held / input_pressed / input_released`
 4. `menu_update()` (returns true while the pause menu freezes the world), `dialogue_update()`
@@ -67,7 +67,7 @@ Input is read right after vblank and its result is on screen at the next vblank:
 | BG3 | Lines from `draw_line` (`draw.c`): tiles 400–511 of CBB 2, rebuilt every frame, only enabled while something is drawn | CBB 2 / SBB 31 |
 | OBJ | Entities; OAM 127 is the dialogue portrait. Frames over 64×64 are drawn as several OBJs (`SpritePiece`s, cut by the codegen) | 1D mapping |
 
-BG palette banks: 0 backdrop (entries 1–15: `draw_line` colors), 1–10 tileset, 11 background layer, 12–13 dialogue, 14–15 HUD text. Each sprite asset gets its own OBJ palette bank (reference counted, `pal_acquire`). Sprite tiles live in shared frame slots (`frame_acquire` in `entity.c`): entities showing the same frame of the same sprite share one copy, and entities that are off screen or hidden hold none (their frame is uploaded again when they come into view). Frames of 64+ tiles are allocated from the top of sprite memory and small ones from the bottom, so animation churn doesn't fragment the space big frames need.
+BG palette banks: 0 backdrop (entries 1–15: `draw_line` colors), 1–10 tileset, 11 background layer, 12–13 dialogue, 14–15 HUD text. Each sprite asset on screen gets an OBJ palette bank (reference counted, `pal_acquire`): entities take one when they come into view and give it back when they leave, and new colors are written in vblank. With all 16 in use, further sprites aren't drawn and the frame budget overlay says so. Sprite tiles live in shared frame slots (`frame_acquire` in `entity.c`): entities showing the same frame of the same sprite share one copy, and entities that are off screen or hidden hold none (their frame is uploaded again when they come into view). Frames of 64+ tiles are allocated from the top of sprite memory and small ones from the bottom, so animation churn doesn't fragment the space big frames need. At most 16 KB of frames are uploaded per vblank; frames past that budget appear a frame later.
 
 ### Sound (`sound.c`)
 
@@ -75,7 +75,7 @@ Timer 0 overflows at 13379 Hz, exactly 224 samples per 59.73 Hz frame, and drive
 
 ### Saves (`save.c`) and menus (`menu.c`)
 
-SRAM at `0x0E000000`, byte access only; the `SRAM_V113` string in the ROM tells emulators the save type. Bytes 0–4095 are four 1 KB slots (a `"TACO"` header with scene, player position, variable count, then `vars[]`), the rest is `save_write`/`save_read` space. `load_game` is deferred to the end of the frame like `load_scene`. The player is the first entity tagged `Player` (`player_tag`, generated).
+SRAM at `0x0E000000`, byte access only; the `SRAM_V113` string in the ROM tells emulators the save type. Bytes 0–4095 are four 1 KB slots (a `"TACO"` header with scene, player position, variable count and an FNV-1a checksum, then `vars[]`). `save_game` clears the magic first, writes the variables, then the header with the magic last, so a save cut off by power loss reads as empty rather than mixing old and new data, the rest is `save_write`/`save_read` space. `load_game` is deferred to the end of the frame like `load_scene`. The player is the first entity tagged `Player` (`player_tag`, generated).
 
 The menus draw on BG0 rows 3–18 and clear the input so scripts don't see it. The pause menu darkens every layer but BG0 with `BLDCNT`/`BLDY`. Their settings are the generated `menu_settings`.
 
@@ -107,7 +107,7 @@ Code runs as Thumb from the cartridge. Tight loops can be marked `IWRAM_CODE` (f
 - `Assets.swift`: every asset type (`SpriteAsset`, `TilesetAsset`, `PrefabAsset`, `SceneAsset`, `PlatformerSettings`, `DialogueAsset`, `SpeakerAsset`, `TextBoxStyleAsset`, `FontAsset`) and the components (`EntityDef`, `ColliderComponent`, ...). Decoding is forgiving: missing keys fall back to defaults, so old projects keep loading.
 - `Project.swift`: `GameProject` loads `project.json` plus every `assets/**/*.{sprite,tileset,prefab,scene,platformer,dialogue,speaker,textbox,font}.json` and `scripts/**/*.c`. Assets are keyed by UUID; saving writes only what changed.
 - `ScriptParser.swift`: finds `SCRIPT(...)` blocks, fields, defaults and which callbacks exist (comments are stripped first).
-- `Codegen.swift`: writes `script_types.h` (tags, vars, tile flags, scene ids, script structs, weak callback prototypes, `extern` prefab/sprite/dialogue names) and `assets.c` (graphics converted to 4bpp tiles + palettes, maps, prefabs, scenes, platformer settings, dialogue).
+- `Codegen.swift`: `validate()` checks the project first (unreadable files from `GameProject.loadIssues`, names that clash as C symbols, engine limits). Then it writes `script_types.h` (tags, vars, tile flags, scene ids, script structs, weak callback prototypes, `extern` prefab/sprite/dialogue names) and `assets.c` (graphics converted to 4bpp tiles + palettes, maps, prefabs, scenes, platformer settings, dialogue).
 - `Sound.swift`: converts the project's audio files (cached by modification date).
 - `WebExport.swift`: writes a bare `index.html` that only runs the game (EmulatorJS, pinned to one version, from its CDN) and `game.gba`.
 - `Builder.swift`: finds the engine and devkitARM, runs GCC directly (in parallel, only on changed files), links, fixes the ROM header, turns compiler/linker output into clickable diagnostics, and launches mGBA (`launch`).
@@ -132,4 +132,4 @@ Code runs as Thumb from the cartridge. Tight loops can be marked `IWRAM_CODE` (f
 - **New field in a generated struct** (e.g. `PlatformerSettings`): change the struct in `engine.h`, the Swift model in `Assets.swift` (with a default in the decoder), and the matching line in `Codegen.swift`. The field order in C and in the codegen must match.
 - **New ready-made prefab**: add a case to `Premade`, its script(s) to `engine/templates/scripts/`, its art to `Placeholders.swift`, and a row to [prefabs.md](prefabs.md).
 - **UI change**: take spacing, fonts, radii and colors from `Theme.swift` (`Space`, `Typo`, `Radius`, `Tone`, `Motion`); add a token rather than a literal. Reuse `PanelHeader`, `PanelTabBar`/`PanelTab` and `SectionLabel` for panel chrome.
-- **Testing a change**: `gbaexport build <project> --run` builds and opens a project without the app. `swift build` in `editor/` must stay free of errors, and the C must compile with `-Wall` without warnings.
+- **Testing a change**: `swift run enginekit-tests` in `editor/` runs the EngineKit tests (no Xcode needed). After an intended change to generated code, update its golden file with `swift run enginekit-tests --update-golden`. `gbaexport build <project> --run` builds and opens a project without the app. `swift build` in `editor/` must stay free of errors, and the C must compile with `-Wall` without warnings.

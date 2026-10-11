@@ -5,7 +5,7 @@ Taco Engine makes Game Boy Advance games on a Mac. It comes in two halves:
 - **The editor**, a Mac app in the style of Unity: scenes, prefabs, an Inspector and a Project browser.
 - **The runtime**, a small C engine that runs on the GBA. Game logic is written as short C scripts against its API.
 
-Press **Play** and Taco Engine generates code from your project, compiles a real `.gba` ROM with devkitARM and opens it in mGBA. The same ROM runs on hardware, in any emulator, or on a web page.
+Press **Play** and Taco Engine generates code from your project, compiles a real `.gba` ROM with devkitARM and opens it in mGBA. The same ROM runs in any emulator or on a web page, and on a real GBA once devkitPro's `gbafix` has added the header logo (see [Building](docs/building.md#real-hardware)).
 
 ## Features
 
@@ -52,7 +52,6 @@ Start with [Getting started](docs/getting-started.md). The full list is in [docs
 
 - The editor runs on macOS only. Games run anywhere a GBA ROM runs.
 - Sound is 8-bit mono at 13.4 kHz. A minute of music takes about 800 KB of the 32 MB cartridge.
-- The web export loads EmulatorJS from its servers, so players need an internet connection.
 
 ## Repository layout
 
@@ -66,4 +65,4 @@ docs/       documentation
 
 Taco Engine is released under the [zlib license](LICENSE). Games you make with it are yours: the license does not require crediting Taco Engine in your game, and you may sell your games.
 
-Exported web pages load [EmulatorJS](https://emulatorjs.org) (GPL-3.0) from its CDN. Games are built with [devkitPro](https://devkitpro.org)'s toolchain and played in [mGBA](https://mgba.io). These are separate projects with their own licenses.
+Web exports include a copy of [EmulatorJS](https://emulatorjs.org) (GPL-3.0), with its license. Games are built with [devkitPro](https://devkitpro.org)'s toolchain and played in [mGBA](https://mgba.io). These are separate projects with their own licenses.

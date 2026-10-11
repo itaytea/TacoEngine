@@ -9,5 +9,7 @@ First public release.
 - **Saves**: four save slots in cartridge SRAM, plus free space for scripts (`save_game`, `load_game`, `save_write`).
 - **Menus**: an optional title menu (New Game / Continue) and pause menu (Resume / Save / Quit to Title).
 - **Frame budget**: an optional on-screen CPU meter.
-- **Web export**: Game ▸ Export for Web… writes a page that's only the game, ready to embed on itch.io or any site.
+- **Web export**: Game ▸ Export for Web… writes a page that's only the game, ready to embed on itch.io or any site, with EmulatorJS included so it runs offline.
+- **Reliability**: menus no longer re-trigger held buttons; sprite palettes are shared correctly when many sprites are on screen; saves carry a checksum and survive interrupted writes; `EntityHandle` for references that outlive their entity; unreadable asset files, name clashes and engine limits are reported at build time; builds are reproducible; scene loading and diagonal scrolling no longer tear.
+- **Tests**: `swift run enginekit-tests` in `editor/`.
 - **App**: the editor is now called Taco Engine, like the runtime, and TacoEngine.app includes the engine and documentation, so it works outside the repository.

@@ -8,7 +8,7 @@ Each asset is a JSON file (`*.sprite.json`, `*.tileset.json`, `*.prefab.json`, `
 - **Frame size**: up to 256×256. The GBA only has certain sprite sizes (8, 16, 32 or 64 per side, square or 2:1); other sizes are padded up to the nearest one. Frames bigger than 64×64 are split into 64×64 pieces that move together (empty pieces are skipped). A 128×128 frame takes a quarter of sprite memory, but copies showing the same frame share it and off-screen sprites use none, so what counts is how many *different* big frames are on screen at once (about three 128×128 ones). Dialogue portraits must fit in 64×64.
 - **Pivot**: the pixel that sits at the entity's position (bottom-center suits characters).
 - **Animations**: a name, a list of frames, a speed and loop on/off. Click frames on the sheet to add them. Scripts use `play(e, "name")`.
-- **Colors**: up to 15 plus transparency per sprite (extra colors are reduced automatically, with a warning). Up to 16 different sprites can be on screen at once.
+- **Colors**: up to 15 plus transparency per sprite (extra colors are reduced automatically, with a warning). Up to 16 different sprites can be on screen at once (off-screen entities don't count).
 
 ## Tilesets
 

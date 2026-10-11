@@ -32,18 +32,24 @@ gbaexport export-web <project> <folder>        # build and export for the web
 
 ## Web export
 
-**Game ▸ Export for Web…** builds the game from its start scene and writes a folder with `index.html`, `game.gba` and a `README.txt`. The page is only the game: it fills the browser window, or the iframe it's embedded in, letterboxed to the GBA's 3:2 shape. Titles, descriptions and instructions are left to the page you embed it in.
+**Game ▸ Export for Web…** builds the game from its start scene and writes a folder with `index.html`, `game.gba`, an `emulatorjs/` folder and a `README.txt`. The page is only the game: it fills the browser window, or the iframe it's embedded in, letterboxed to the GBA's 3:2 shape. Titles, descriptions and instructions are left to the page you embed it in.
 
 - **itch.io**: zip the folder and upload it as an HTML game, tick *This file will be played in the browser*, and set the viewport to a 3:2 size such as 720 × 480.
 - **Other sites**: upload the folder and embed it with `<iframe src="game/index.html" width="720" height="480" allowfullscreen></iframe>`.
 
-The game runs in [EmulatorJS](https://emulatorjs.org) 4.2.3, loaded from its CDN, so players need an internet connection. EmulatorJS shows a start button first (browsers only allow sound after a click). Its default keys are the arrows for the D-pad, **Z** for A, **X** for B, **Enter** for Start, **V** for Select and **Q**/**E** for L and R. Gamepads work, and touch screens get on-screen buttons. Saves stay in the player's browser.
+The game runs in [EmulatorJS](https://emulatorjs.org) 4.2.3. Its files (about 1.8 MB, GPL-3.0, license included) are copied into `emulatorjs/`, so the game works offline and doesn't depend on another server. They're downloaded once into your cache folder on the first export and checked against fixed SHA-256 hashes; if that download isn't possible, the export loads EmulatorJS from its servers instead and the Console says so. EmulatorJS shows a start button first (browsers only allow sound after a click). Its default keys are the arrows for the D-pad, **Z** for A, **X** for B, **Enter** for Start, **V** for Select and **Q**/**E** for L and R. Gamepads work, and touch screens get on-screen buttons. Saves stay in the player's browser.
 
 Browsers won't run the game from a page opened straight from disk. Test it with `python3 -m http.server` inside the folder, then visit `http://localhost:8000`.
 
 ## Real hardware
 
-The ROM runs in emulators. Real GBAs and some flashcarts also need the Nintendo logo in the ROM header. Saves use SRAM, which most flashcarts support. Taco Engine writes the title and checksum but not the logo, so run devkitPro's `gbafix build/game.gba`, or let your flashcart patch the header.
+The ROM runs in emulators as it is. Real GBAs, and some flashcarts, only boot a ROM whose header contains Nintendo's logo. Taco Engine doesn't ship that data, but devkitPro's `gbafix` writes it. Install it once:
+
+```bash
+sudo dkp-pacman -S gba-tools
+```
+
+From then on every build runs `gbafix` automatically and `build/game.gba` is ready for hardware. Without it, run `gbafix build/game.gba` yourself or let your flashcart patch the header. Saves use SRAM, which most flashcarts support.
 
 ## Repository layout
 

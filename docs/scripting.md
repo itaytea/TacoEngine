@@ -93,6 +93,7 @@ Keys: `KEY_A KEY_B KEY_SELECT KEY_START KEY_RIGHT KEY_LEFT KEY_UP KEY_DOWN KEY_R
 | `Entity *find_entity(const char *name)` | first entity with that name |
 | `Entity *find_with_tag(int tag)` | first entity with that tag |
 | `Entity *ref_entity(EntityRef r)` | entity for an EntityRef field |
+| `EntityHandle entity_handle(Entity *e)` / `Entity *entity_get(EntityHandle h)` | a reference you can keep across frames: `entity_get` returns NULL once that entity is destroyed. Store handles, not `Entity *`: slots are reused, so an old pointer can end up pointing at a different, newer entity |
 | `bool has_tag(const Entity *e, int tag)` | |
 | `get_script(e, Type)` | the entity's `Type` script data, or NULL |
 | `void send_message(Entity *e, int msg, int arg)` | calls OnMessage on that entity's scripts |
@@ -205,7 +206,7 @@ While a menu is open it takes the buttons, so scripts see no input.
 
 | | |
 |---|---|
-| `text_print(col, row, s)`, `text_print_int(col, row, n)`, `text_print_centered(row, s)` | HUD text on a 30×20 grid |
+| `text_print(col, row, s)`, `text_print_int(col, row, n)`, `text_print_centered(row, s)` | HUD text on a 30×20 grid (text outside it is ignored) |
 | `text_clear()`, `text_clear_row(row)` | |
 | `screen_fade(level)` | 0 = normal … 16 = black |
 | `set_background(RGB15(r, g, b))` | components 0–31 |
@@ -214,7 +215,7 @@ While a menu is open it takes the buttons, so scripts see no input.
 
 ### Utilities
 
-`rand_int(lo, hi)` (inclusive), `frame_count()`, `fx_sin(angle)` / `fx_cos(angle)` (angle 0–255 = full turn, result in fixed), `clamp`, `iabs`, `sign`.
+`rand_int(lo, hi)` (inclusive; seeded from when the player first presses a button, so each run differs), `frame_count()`, `fx_sin(angle)` / `fx_cos(angle)` (angle 0–255 = full turn, result in fixed), `clamp`, `iabs`, `sign`.
 
 ### Engine messages (OnMessage)
 
@@ -227,4 +228,4 @@ While a menu is open it takes the buttons, so scripts see no input.
 
 ## Frame budget
 
-Turn on **Project Settings ▸ Testing ▸ Show frame budget** to show `CPU x% PEAK y% ENT n` on the bottom row: the share of the frame the game used, the highest it has been, and the entity count. It turns yellow at 85%; over 100% the game slows down. In any game you can also hold **L + R** and press **Select** to toggle it. If a heavy loop (physics for many points, say) costs too much, put `IWRAM_CODE` before its function: it then runs as fast ARM code from internal RAM.
+Turn on **Project Settings ▸ Testing ▸ Show frame budget** to show `CPU x% PEAK y% ENT n` on the bottom row: the share of the frame the game used, the highest it has been, and the entity count. It turns yellow at 85%; over 100% the game slows down. The row above it names any limit hit in the last two seconds: all 16 sprite palettes in use, sprite memory full, the 96-entity limit, or the 8-platformer-body limit. In any game you can also hold **L + R** and press **Select** to toggle it. If a heavy loop (physics for many points, say) costs too much, put `IWRAM_CODE` before its function: it then runs as fast ARM code from internal RAM.

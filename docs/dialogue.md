@@ -32,9 +32,9 @@ Select text in a line and use the formatting bar, or type the tags:
 | `[color=red]…[/color]` | red, yellow, green, blue or gray (set per text box style) |
 | `[pause=30]` | wait 30 frames (half a second) while typing |
 | `[page]` | start a new page |
-| `{coins}` | the value of a variable |
+| `{coins}` | the value of a variable (wrapping leaves room for 5 digits) |
 
-Effects can be combined, e.g. `[b][rainbow]WOW[/rainbow][/b]`. Text wraps automatically; a new line in the editor forces a line break.
+Effects can be combined, e.g. `[b][rainbow]WOW[/rainbow][/b]`. Text wraps automatically; a new line in the editor forces a line break. A page holds up to 160 characters (spaces count); builds warn about longer pages, since the rest would be cut off.
 
 ## The Talk script
 
