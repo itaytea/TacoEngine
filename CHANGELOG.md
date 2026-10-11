@@ -10,4 +10,4 @@ First public release.
 - **Menus**: an optional title menu (New Game / Continue) and pause menu (Resume / Save / Quit to Title).
 - **Frame budget**: an optional on-screen CPU meter.
 - **Web export**: Game ▸ Export for Web… writes a page that's only the game, ready to embed on itch.io or any site.
-- **App**: the editor is now called Taco Engine, like the runtime, and Taco Engine.app includes the engine and documentation, so it works outside the repository.
+- **App**: the editor is now called Taco Engine, like the runtime, and TacoEngine.app includes the engine and documentation, so it works outside the repository.

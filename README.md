@@ -29,10 +29,10 @@ Press **Play** and Taco Engine generates code from your project, compiles a real
 
 ```bash
 ./build_editor.sh
-open "Taco Engine.app"
+open TacoEngine.app
 ```
 
-`Taco Engine.app` carries its own copy of the engine and the docs, so you can move it to Applications.
+`TacoEngine.app` carries its own copy of the engine and the docs, so you can move it to Applications.
 
 1. In the launcher, click **New Project…** and choose a folder.
 2. Choose **Paint** in the toolbar and draw some ground.

@@ -915,13 +915,13 @@ final class EditorModel: ObservableObject {
 
     /// docs/ next to the engine (or next to the app)
     func openDocumentation() {
-        // The copy inside Taco Engine.app, else the docs folder of the repository the engine comes from
+        // The copy inside TacoEngine.app, else the docs folder of the repository the engine comes from
         let candidates = [Bundle.main.resourceURL,
                           project.flatMap { Builder.findEngine(for: $0.root)?.deletingLastPathComponent() },
                           Bundle.main.bundleURL.deletingLastPathComponent()].compactMap { $0 }
         guard let docs = candidates.map({ $0.appendingPathComponent("docs") })
             .first(where: { FileManager.default.fileExists(atPath: $0.appendingPathComponent("README.md").path) }) else {
-            errorMessage = "Couldn't find the documentation. Rebuild Taco Engine.app with build_editor.sh, which copies it into the app."
+            errorMessage = "Couldn't find the documentation. Rebuild TacoEngine.app with build_editor.sh, which copies it into the app."
             return
         }
         NSWorkspace.shared.open(docs.appendingPathComponent("README.md"))

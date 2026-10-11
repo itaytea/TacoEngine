@@ -14,8 +14,8 @@ Taco Engine looks for an `engine/` folder (one containing `src/engine.h`):
 
 1. the folder in the `GBA_ENGINE` environment variable,
 2. an `engine/` folder in or above the project folder (up to five levels),
-3. the copy inside `Taco Engine.app` (`build_editor.sh` puts the engine and docs there),
-4. an `engine/` folder next to `Taco Engine.app`.
+3. the copy inside `TacoEngine.app` (`build_editor.sh` puts the engine and docs there),
+4. an `engine/` folder next to `TacoEngine.app`.
 
 devkitPro is found through `DEVKITPRO`, or `/opt/devkitpro` by default.
 

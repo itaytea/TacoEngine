@@ -33,7 +33,7 @@ editor/                Swift package "TacoEngine"
   Sources/EngineKit/   no UI: asset model, JSON, codegen, builder, script parser, physics simulation
   Sources/TacoEngine/   the Mac app (SwiftUI + AppKit)
   Sources/gbaexport/   command-line front end for EngineKit (new / build / check / export-web)
-build_editor.sh        builds Taco Engine.app (release) next to the script, with engine/ and docs/ copied into its Resources
+build_editor.sh        builds TacoEngine.app (release) next to the script, with engine/ and docs/ copied into its Resources
 docs/                  user documentation and this page
 ```
 
@@ -124,7 +124,7 @@ Code runs as Thumb from the cartridge. Tight loops can be marked `IWRAM_CODE` (f
 
 ### Where the engine is found
 
-`$GBA_ENGINE`, else an `engine/` folder in or up to five levels above the project, else the copy in `Taco Engine.app/Contents/Resources`, else next to the app. devkitPro comes from `$DEVKITPRO` or `/opt/devkitpro`.
+`$GBA_ENGINE`, else an `engine/` folder in or up to five levels above the project, else the copy in `TacoEngine.app/Contents/Resources`, else next to the app. devkitPro comes from `$DEVKITPRO` or `/opt/devkitpro`.
 
 ## Common changes
 

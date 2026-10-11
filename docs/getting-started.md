@@ -8,7 +8,7 @@
 4. Build the editor once:
 
 ```bash
-./build_editor.sh && open "Taco Engine.app"
+./build_editor.sh && open TacoEngine.app
 ```
 
    The app includes the engine and these docs, so you can move it to Applications.
