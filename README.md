@@ -23,7 +23,7 @@ Press **Play** and Taco Engine generates code from your project, compiles a real
 - macOS 14 or later, with Xcode or the Swift toolchain (to build the editor)
 - [devkitPro](https://devkitpro.org/wiki/Getting_Started) with the `gba-dev` package, in `/opt/devkitpro`
 - [mGBA](https://mgba.io), in `/Applications`
-- Optional: VS Code or Cursor for editing scripts. Taco Engine opens scripts there at the line with the error.
+- Any code editor, for writing scripts
 
 ## Quick start
 

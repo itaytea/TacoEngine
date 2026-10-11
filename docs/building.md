@@ -6,7 +6,7 @@
 2. Compiles the engine (`engine/src`), the generated code and your scripts with devkitARM's GCC, in parallel. Only changed files are recompiled.
 3. Links `build/game.gba` and opens it in mGBA, replacing a game it's already running. Each run starts fresh (no auto-loaded save states) at real GBA speed (59.73 fps) with a small audio buffer for low input lag, whatever your own mGBA settings say.
 
-Errors show in the Console; click one to open the line in VS Code.
+Errors show in the Console; click one to open the file at that line.
 
 ## Where the engine comes from
 

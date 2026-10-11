@@ -59,11 +59,11 @@ When Taco Engine opens it shows your recent projects. Click one to open it, or c
 - **⇧-click** selects a range and **⌘-click** toggles items. **Delete** moves the selected files to the Trash after asking.
 - Sound files (WAV, AIFF, MP3, M4A, CAF, FLAC) show with a speaker icon. Select one to play it in the Inspector or make it the open scene's music.
 - The panel updates by itself when files change on disk (for example after re-exporting from Aseprite).
-- Double-clicking opens the item: scenes open in the Scene view, scripts in VS Code, and sprites, tilesets, dialogues, text boxes and platformer settings in the center editor.
+- Double-clicking opens the item: scenes open in the Scene view, scripts in your code editor, and sprites, tilesets, dialogues, text boxes and platformer settings in the center editor.
 
 ## Console
 
-Shows build errors and warnings. Click one to open the file at that line in VS Code.
+Shows build errors and warnings. Click one to open the file at that line in your code editor.
 
 ## Keyboard
 

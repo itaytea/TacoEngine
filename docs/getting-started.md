@@ -4,7 +4,7 @@
 
 1. **devkitPro** with devkitARM, in `/opt/devkitpro` (the default). Taco Engine uses its compiler. Install devkitPro's pacman from [devkitpro.org](https://devkitpro.org/wiki/Getting_Started), then run `sudo dkp-pacman -S gba-dev`.
 2. **mGBA**, in `/Applications`. Play opens your game in it.
-3. **VS Code** (optional) for editing scripts. Taco Engine opens scripts there and jumps to the line with the error. Cursor is used if VS Code isn't installed.
+3. **Any code editor**, for writing scripts. If VS Code or Cursor is installed, Taco Engine opens scripts there at the line with the error; otherwise it uses your default app for `.c` files.
 4. Build the editor once:
 
 ```bash
@@ -32,7 +32,7 @@ project.json         name, tags, tile flags, variables, scene order
 assets/              everything you see in the Project panel (organize with folders)
 scripts/             C scripts (scripts can also live under assets/)
 build/               generated code, objects and game.gba (safe to delete)
-compile_flags.txt    lets VS Code find engine.h while you edit scripts
+compile_flags.txt    lets your code editor find engine.h while you edit scripts
 ```
 
 Every asset is a small JSON file next to its image, so projects work well with git.
