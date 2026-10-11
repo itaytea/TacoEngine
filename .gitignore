@@ -6,3 +6,6 @@ TacoEngine.app/
 build/
 *.sav
 *.ss[0-9]
+
+# local assistant instructions
+CLAUDE.md
