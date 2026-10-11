@@ -1,6 +1,6 @@
 # The editor
 
-When TacoMaker opens it shows your recent projects. Click one to open it, or choose **New Project…** or **Open…**. **File ▸ Open Recent** and **File ▸ Close Project** (⇧⌘W) work from inside a project.
+When Taco Engine opens it shows your recent projects. Click one to open it, or choose **New Project…** or **Open…**. **File ▸ Open Recent** and **File ▸ Close Project** (⇧⌘W) work from inside a project.
 
 ```
 ┌───────────┬───────────────────────────┬────────────┐

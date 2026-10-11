@@ -1,6 +1,6 @@
 # Assets
 
-Each asset is a JSON file (`*.sprite.json`, `*.tileset.json`, `*.prefab.json`, `*.scene.json`, `*.platformer.json`, `*.dialogue.json`, `*.speaker.json`, `*.textbox.json`, `*.font.json`). Images sit next to the JSON that uses them. Edit images in any app; TacoMaker reloads them when they change.
+Each asset is a JSON file (`*.sprite.json`, `*.tileset.json`, `*.prefab.json`, `*.scene.json`, `*.platformer.json`, `*.dialogue.json`, `*.speaker.json`, `*.textbox.json`, `*.font.json`). Images sit next to the JSON that uses them. Edit images in any app; Taco Engine reloads them when they change.
 
 ## Sprites
 

@@ -10,12 +10,12 @@ Errors show in the Console; click one to open the line in VS Code.
 
 ## Where the engine comes from
 
-TacoMaker looks for an `engine/` folder (one containing `src/engine.h`):
+Taco Engine looks for an `engine/` folder (one containing `src/engine.h`):
 
 1. the folder in the `GBA_ENGINE` environment variable,
 2. an `engine/` folder in or above the project folder (up to five levels),
-3. the copy inside `TacoMaker.app` (`build_editor.sh` puts the engine and docs there),
-4. an `engine/` folder next to `TacoMaker.app`.
+3. the copy inside `Taco Engine.app` (`build_editor.sh` puts the engine and docs there),
+4. an `engine/` folder next to `Taco Engine.app`.
 
 devkitPro is found through `DEVKITPRO`, or `/opt/devkitpro` by default.
 
@@ -43,13 +43,13 @@ Browsers won't run the game from a page opened straight from disk. Test it with 
 
 ## Real hardware
 
-The ROM runs in emulators. Real GBAs and some flashcarts also need the Nintendo logo in the ROM header. Saves use SRAM, which most flashcarts support. TacoMaker writes the title and checksum but not the logo, so run devkitPro's `gbafix build/game.gba`, or let your flashcart patch the header.
+The ROM runs in emulators. Real GBAs and some flashcarts also need the Nintendo logo in the ROM header. Saves use SRAM, which most flashcarts support. Taco Engine writes the title and checksum but not the logo, so run devkitPro's `gbafix build/game.gba`, or let your flashcart patch the header.
 
 ## Repository layout
 
 ```
 engine/            the GBA runtime in C (engine.h is the scripting API)
 engine/templates/  scripts copied into projects (talk.c, respawn.c, and the ready-made prefabs' scripts)
-editor/            Swift package: EngineKit (assets, codegen, builds), TacoMaker (the app), gbaexport
+editor/            Swift package: EngineKit (assets, codegen, builds), TacoEngine (the editor app), gbaexport
 docs/              this documentation
 ```

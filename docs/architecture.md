@@ -5,7 +5,7 @@ This page is for people working on the engine or the editor themselves. To make 
 Taco Engine has two halves:
 
 - **The runtime** (`engine/`): a small GBA game engine in C. It runs on the console and knows nothing about the editor.
-- **TacoMaker** (`editor/`): a SwiftUI Mac app that edits projects, turns them into C (codegen), compiles everything with devkitARM and opens the ROM in mGBA.
+- **The editor** (`editor/`): a SwiftUI Mac app that edits projects, turns them into C (codegen), compiles everything with devkitARM and opens the ROM in mGBA.
 
 The bridge between them is generated C code: the editor writes `build/generated/script_types.h` and `build/generated/assets.c`, and the runtime only ever sees those.
 
@@ -29,11 +29,11 @@ engine/src/            the runtime (C, no libgba)
   save.c               save slots and free space in cartridge SRAM
   menu.c               title and pause menus on the HUD text layer
 engine/templates/scripts/   scripts the editor copies into projects (Talk, Respawn, ready-made prefabs)
-editor/                Swift package "TacoMaker"
+editor/                Swift package "TacoEngine"
   Sources/EngineKit/   no UI: asset model, JSON, codegen, builder, script parser, physics simulation
-  Sources/TacoMaker/   the Mac app (SwiftUI + AppKit)
+  Sources/TacoEngine/   the Mac app (SwiftUI + AppKit)
   Sources/gbaexport/   command-line front end for EngineKit (new / build / check / export-web)
-build_editor.sh        builds TacoMaker.app (release) next to the script, with engine/ and docs/ copied into its Resources
+build_editor.sh        builds Taco Engine.app (release) next to the script, with engine/ and docs/ copied into its Resources
 docs/                  user documentation and this page
 ```
 
@@ -115,16 +115,16 @@ Code runs as Thumb from the cartridge. Tight loops can be marked `IWRAM_CODE` (f
 - `Templates.swift`: new-project contents and copying scripts from `engine/templates/scripts`.
 - `Placeholders.swift`: pixel art for the ready-made prefabs.
 
-### TacoMaker (the app)
+### The editor app (`Sources/TacoEngine`)
 
-- `EditorModel.swift`: the single source of truth (`@Published project`). It also holds the entity and Project-panel selections (sets, with ⇧ range anchors), copy/paste through the pasteboard type `local.tacomaker.entities`, the keyboard monitor (Delete, arrows, ⌘C/⌘V/⌘D, ⌘S) and the recent projects shown by `WelcomeView`. Every edit goes through `checkpoint()` so ⌘Z/⇧⌘Z work through the window's `NSUndoManager`; saving is debounced. A folder watcher and a script timer pick up changes made outside the app.
+- `EditorModel.swift`: the single source of truth (`@Published project`). It also holds the entity and Project-panel selections (sets, with ⇧ range anchors), copy/paste through the pasteboard type `local.tacoengine.entities`, the keyboard monitor (Delete, arrows, ⌘C/⌘V/⌘D, ⌘S) and the recent projects shown by `WelcomeView`. Every edit goes through `checkpoint()` so ⌘Z/⇧⌘Z work through the window's `NSUndoManager`; saving is debounced. A folder watcher and a script timer pick up changes made outside the app.
 - `Theme.swift`: the design tokens (spacing on a 4 pt scale, the type ramp, corner radii, semantic colors, animation timing). Views use these instead of literal values; shared pieces (`PanelHeader`, `PanelTabBar`, `PanelTab`, `SectionLabel`) are in `Common.swift`.
 - Panels: `HierarchyPanel`, `SceneViewPanel` (with `SceneCamera` for pan/zoom), `InspectorPanel`, `BottomPanel` (Project browser + Console), `AssetEditors`, `PhysicsView` (movement graphs), `DialogueEditor`.
 - Ready-made prefabs (`Premade` in `EditorModel.swift`): each one copies its scripts from `engine/templates/scripts`, generates its placeholder art into `assets/premade/` and creates the prefab the first time it's used.
 
 ### Where the engine is found
 
-`$GBA_ENGINE`, else an `engine/` folder in or up to five levels above the project, else the copy in `TacoMaker.app/Contents/Resources`, else next to the app. devkitPro comes from `$DEVKITPRO` or `/opt/devkitpro`.
+`$GBA_ENGINE`, else an `engine/` folder in or up to five levels above the project, else the copy in `Taco Engine.app/Contents/Resources`, else next to the app. devkitPro comes from `$DEVKITPRO` or `/opt/devkitpro`.
 
 ## Common changes
 

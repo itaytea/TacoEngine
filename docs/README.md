@@ -1,6 +1,6 @@
 # Taco Engine documentation
 
-TacoMaker makes Game Boy Advance games. You build scenes in a Unity-style editor, write game logic as small C scripts, and press **Play** to run the game in mGBA.
+Taco Engine makes Game Boy Advance games. You build scenes in a Unity-style editor, write game logic as small C scripts, and press **Play** to run the game in mGBA.
 
 | Page | What it covers |
 |---|---|

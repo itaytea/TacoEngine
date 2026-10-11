@@ -1,11 +1,11 @@
 # Taco Engine
 
-Taco Engine is a toolkit for making Game Boy Advance games on a Mac. It has two parts:
+Taco Engine makes Game Boy Advance games on a Mac. It comes in two halves:
 
-- **TacoMaker**, an editor in the style of Unity: scenes, prefabs, an Inspector and a Project browser.
+- **The editor**, a Mac app in the style of Unity: scenes, prefabs, an Inspector and a Project browser.
 - **The runtime**, a small C engine that runs on the GBA. Game logic is written as short C scripts against its API.
 
-Press **Play** and TacoMaker generates code from your project, compiles a real `.gba` ROM with devkitARM and opens it in mGBA. The same ROM runs on hardware, in any emulator, or on a web page.
+Press **Play** and Taco Engine generates code from your project, compiles a real `.gba` ROM with devkitARM and opens it in mGBA. The same ROM runs on hardware, in any emulator, or on a web page.
 
 ## Features
 
@@ -20,19 +20,19 @@ Press **Play** and TacoMaker generates code from your project, compiles a real `
 
 ## Requirements
 
-- macOS 14 or later, with Xcode or the Swift toolchain (to build TacoMaker)
+- macOS 14 or later, with Xcode or the Swift toolchain (to build the editor)
 - [devkitPro](https://devkitpro.org/wiki/Getting_Started) with the `gba-dev` package, in `/opt/devkitpro`
 - [mGBA](https://mgba.io), in `/Applications`
-- Optional: VS Code or Cursor for editing scripts. TacoMaker opens scripts there at the line with the error.
+- Optional: VS Code or Cursor for editing scripts. Taco Engine opens scripts there at the line with the error.
 
 ## Quick start
 
 ```bash
 ./build_editor.sh
-open TacoMaker.app
+open "Taco Engine.app"
 ```
 
-`TacoMaker.app` carries its own copy of the engine and the docs, so you can move it to Applications.
+`Taco Engine.app` carries its own copy of the engine and the docs, so you can move it to Applications.
 
 1. In the launcher, click **New Project…** and choose a folder.
 2. Choose **Paint** in the toolbar and draw some ground.
@@ -50,7 +50,7 @@ Start with [Getting started](docs/getting-started.md). The full list is in [docs
 
 ## Limitations
 
-- TacoMaker runs on macOS only. Games run anywhere a GBA ROM runs.
+- The editor runs on macOS only. Games run anywhere a GBA ROM runs.
 - Sound is 8-bit mono at 13.4 kHz. A minute of music takes about 800 KB of the 32 MB cartridge.
 - The web export loads EmulatorJS from its servers, so players need an internet connection.
 
@@ -58,7 +58,7 @@ Start with [Getting started](docs/getting-started.md). The full list is in [docs
 
 ```
 engine/     the GBA runtime in C (engine/src/engine.h is the scripting API)
-editor/     Swift package: EngineKit (assets, codegen, builds), the TacoMaker app, gbaexport (CLI)
+editor/     Swift package: EngineKit (assets, codegen, builds), the editor app, gbaexport (CLI)
 docs/       documentation
 ```
 

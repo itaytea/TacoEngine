@@ -2,15 +2,15 @@
 import PackageDescription
 
 let package = Package(
-    name: "TacoMaker",
+    name: "TacoEngine",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "TacoMaker", targets: ["TacoMaker"]),
+        .executable(name: "TacoEngine", targets: ["TacoEngine"]),
         .executable(name: "gbaexport", targets: ["gbaexport"]),
     ],
     targets: [
         .target(name: "EngineKit"),
-        .executableTarget(name: "TacoMaker", dependencies: ["EngineKit"]),
+        .executableTarget(name: "TacoEngine", dependencies: ["EngineKit"]),
         .executableTarget(name: "gbaexport", dependencies: ["EngineKit"]),
     ]
 )

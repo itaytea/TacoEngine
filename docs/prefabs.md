@@ -1,6 +1,6 @@
 # Ready-made prefabs
 
-Add them with **Hierarchy ▸ +** (places one in the scene) or **Project ▸ Create ▸ Ready-made Prefab** (just creates the prefab). The first time, TacoMaker adds their art to `assets/premade/` and their scripts to `scripts/`. After that it reuses the same prefab, so changing it changes every copy. Swap the placeholder art by editing the PNGs.
+Add them with **Hierarchy ▸ +** (places one in the scene) or **Project ▸ Create ▸ Ready-made Prefab** (just creates the prefab). The first time, Taco Engine adds their art to `assets/premade/` and their scripts to `scripts/`. After that it reuses the same prefab, so changing it changes every copy. Swap the placeholder art by editing the PNGs.
 
 | Prefab | What it does | Scripts |
 |---|---|---|

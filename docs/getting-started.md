@@ -2,13 +2,13 @@
 
 ## Install
 
-1. **devkitPro** with devkitARM, in `/opt/devkitpro` (the default). TacoMaker uses its compiler. Install devkitPro's pacman from [devkitpro.org](https://devkitpro.org/wiki/Getting_Started), then run `sudo dkp-pacman -S gba-dev`.
+1. **devkitPro** with devkitARM, in `/opt/devkitpro` (the default). Taco Engine uses its compiler. Install devkitPro's pacman from [devkitpro.org](https://devkitpro.org/wiki/Getting_Started), then run `sudo dkp-pacman -S gba-dev`.
 2. **mGBA**, in `/Applications`. Play opens your game in it.
-3. **VS Code** (optional) for editing scripts. TacoMaker opens scripts there and jumps to the line with the error. Cursor is used if VS Code isn't installed.
+3. **VS Code** (optional) for editing scripts. Taco Engine opens scripts there and jumps to the line with the error. Cursor is used if VS Code isn't installed.
 4. Build the editor once:
 
 ```bash
-./build_editor.sh && open TacoMaker.app
+./build_editor.sh && open "Taco Engine.app"
 ```
 
    The app includes the engine and these docs, so you can move it to Applications.

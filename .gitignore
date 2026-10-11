@@ -1,7 +1,7 @@
 .DS_Store
 editor/.build/
 editor/.swiftpm/
-TacoMaker.app/
+Taco Engine.app/
 # game projects' build output, saves and save states
 build/
 *.sav

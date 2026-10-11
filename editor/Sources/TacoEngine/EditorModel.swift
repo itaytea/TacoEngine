@@ -105,7 +105,7 @@ final class EditorModel: ObservableObject {
         }
     }
 
-    /// Pick up files added, removed or edited outside TacoMaker (Finder, Aseprite, a text editor…)
+    /// Pick up files added, removed or edited outside Taco Engine (Finder, Aseprite, a text editor…)
     func syncFromDisk(imagesChanged: Bool) {
         guard let project else { return }
         if imagesChanged {
@@ -310,6 +310,7 @@ final class EditorModel: ObservableObject {
     }
 
     @Published var recents: [RecentProject] = (UserDefaults.standard.stringArray(forKey: EditorModel.recentKey)
+        ?? UserDefaults(suiteName: "local.tacomaker")?.stringArray(forKey: EditorModel.recentKey)   // before the app was renamed
         ?? [UserDefaults.standard.string(forKey: EditorModel.lastProjectKey)].compactMap { $0 }).map { RecentProject(path: $0) }
 
     private func addRecent(_ url: URL) {
@@ -346,7 +347,7 @@ final class EditorModel: ObservableObject {
         panel.canChooseFiles = false
         panel.message = "Choose a project folder (one containing project.json)"
         if panel.runModal() == .OK, let url = panel.url {
-            if GameProject.isProject(url) { open(url) } else { errorMessage = "That folder isn't a TacoMaker project. Choose the folder that contains project.json." }
+            if GameProject.isProject(url) { open(url) } else { errorMessage = "That folder isn't a Taco Engine project. Choose the folder that contains project.json." }
         }
     }
 
@@ -547,7 +548,7 @@ final class EditorModel: ObservableObject {
         pasteEntities(data, offset: 16)
     }
 
-    static let pasteboardType = NSPasteboard.PasteboardType("local.tacomaker.entities")
+    static let pasteboardType = NSPasteboard.PasteboardType("local.tacoengine.entities")
 
     /// The selected entities plus their children, as JSON (positions of top-level ones made absolute)
     func encodeSelection() -> Data? {
@@ -914,13 +915,13 @@ final class EditorModel: ObservableObject {
 
     /// docs/ next to the engine (or next to the app)
     func openDocumentation() {
-        // The copy inside TacoMaker.app, else the docs folder of the repository the engine comes from
+        // The copy inside Taco Engine.app, else the docs folder of the repository the engine comes from
         let candidates = [Bundle.main.resourceURL,
                           project.flatMap { Builder.findEngine(for: $0.root)?.deletingLastPathComponent() },
                           Bundle.main.bundleURL.deletingLastPathComponent()].compactMap { $0 }
         guard let docs = candidates.map({ $0.appendingPathComponent("docs") })
             .first(where: { FileManager.default.fileExists(atPath: $0.appendingPathComponent("README.md").path) }) else {
-            errorMessage = "Couldn't find the documentation. Rebuild TacoMaker.app with build_editor.sh, which copies it into the app."
+            errorMessage = "Couldn't find the documentation. Rebuild Taco Engine.app with build_editor.sh, which copies it into the app."
             return
         }
         NSWorkspace.shared.open(docs.appendingPathComponent("README.md"))

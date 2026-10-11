@@ -1,6 +1,6 @@
 import SwiftUI
 
-// TacoMaker's design tokens. Every spacing, text style, corner radius and color in the app comes from
+// Taco Engine's design tokens. Every spacing, text style, corner radius and color in the app comes from
 // here, so panels built at different times look like one product. Don't use literal values in views:
 // add a token if none fits.
 

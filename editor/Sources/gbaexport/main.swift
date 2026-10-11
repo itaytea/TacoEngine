@@ -1,7 +1,7 @@
 import EngineKit
 import Foundation
 
-// Command-line companion to TacoMaker:
+// Command-line companion to Taco Engine:
 //   gbaexport new <folder>                        create a new project
 //   gbaexport build <project> [--scene Name] [--run]
 //   gbaexport check <project>                     parse scripts and generate code without compiling

@@ -3,12 +3,12 @@ import EngineKit
 import SwiftUI
 
 @main
-struct TacoMakerApp: App {
+struct TacoEngineApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var model = EditorModel()
 
     var body: some Scene {
-        WindowGroup("TacoMaker") {
+        WindowGroup("Taco Engine") {
             MainView()
                 .environmentObject(model)
                 .frame(minWidth: 1100, minHeight: 700)
@@ -39,7 +39,7 @@ struct TacoMakerApp: App {
                 Button("Import Tileset…") { model.importImage(asTileset: true) }
             }
             CommandGroup(replacing: .help) {
-                Button("TacoMaker Documentation") { model.openDocumentation() }
+                Button("Taco Engine Documentation") { model.openDocumentation() }
             }
             CommandMenu("Game") {
                 Button("Play Current Scene") { model.play() }.keyboardShortcut("p")
@@ -87,14 +87,14 @@ struct MainView: View {
                 WelcomeView()
             }
         }
-        .alert("TacoMaker", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
+        .alert("Taco Engine", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK") { model.errorMessage = nil }
         } message: {
             Text(model.errorMessage ?? "")
         }
         .onAppear { model.undoManager = undoManager }
         .onChange(of: undoManager) { _, um in model.undoManager = um }
-        .navigationTitle(model.project?.settings.name ?? "TacoMaker")
+        .navigationTitle(model.project?.settings.name ?? "Taco Engine")
         .navigationSubtitle(model.openScene.flatMap { model.project?.scenes[$0]?.name } ?? "")
     }
 
@@ -165,7 +165,7 @@ struct WelcomeView: View {
                 Spacer()
                 if let icon = NSApp.applicationIconImage { Image(nsImage: icon).resizable().frame(width: 96, height: 96) }
                 VStack(spacing: Space.xs) {
-                    Text("TacoMaker").font(Typo.display)
+                    Text("Taco Engine").font(Typo.display)
                     Text("Game Boy Advance games, made on a Mac").font(Typo.label).foregroundStyle(.secondary)
                 }
                 VStack(spacing: Space.sm) {

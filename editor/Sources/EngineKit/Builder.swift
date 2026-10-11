@@ -23,7 +23,7 @@ public enum Builder {
     static var tool: String { devkitPro + "/devkitARM/bin/arm-none-eabi-" }
 
     /// The engine folder: $GBA_ENGINE, an `engine/` folder in or above the project, the copy inside
-    /// TacoMaker.app, or an `engine/` folder next to the app.
+    /// Taco Engine.app, or an `engine/` folder next to the app.
     public static func findEngine(for project: URL) -> URL? {
         func check(_ u: URL) -> URL? {
             let e = u.appendingPathComponent("engine")
@@ -70,8 +70,8 @@ public enum Builder {
             diags.append(Diagnostic(severity: .error, message: msg))
             return BuildResult(success: false, log: log + msg + "\n", diagnostics: diags, rom: nil)
         }
-        guard let engine = findEngine(for: p.root) else { return fail("Couldn't find the Taco Engine runtime (engine/src/engine.h). Rebuild TacoMaker.app with build_editor.sh, or set the GBA_ENGINE environment variable to the engine folder.") }
-        guard FileManager.default.fileExists(atPath: tool + "gcc") else { return fail("devkitARM isn't installed (looked in \(devkitPro)). TacoMaker needs it to build games: install devkitPro with the gba-dev package, see https://devkitpro.org/wiki/Getting_Started") }
+        guard let engine = findEngine(for: p.root) else { return fail("Couldn't find the engine runtime (engine/src/engine.h). Rebuild Taco Engine.app with build_editor.sh, or set the GBA_ENGINE environment variable to the engine folder.") }
+        guard FileManager.default.fileExists(atPath: tool + "gcc") else { return fail("devkitARM isn't installed (looked in \(devkitPro)). Taco Engine needs it to build games: install devkitPro with the gba-dev package, see https://devkitpro.org/wiki/Getting_Started") }
 
         progress?("Exporting assets…")
         do {
