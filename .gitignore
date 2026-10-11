@@ -1,0 +1,8 @@
+.DS_Store
+editor/.build/
+editor/.swiftpm/
+TacoMaker.app/
+# game projects' build output, saves and save states
+build/
+*.sav
+*.ss[0-9]
