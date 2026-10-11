@@ -71,10 +71,33 @@ static inline __attribute__((always_inline)) void plot(Pen *pen, int x, int y) {
     *row = (*row & ~(15u << sh)) | (pen->color << sh);
 }
 
+// Cohen-Sutherland: cut a line to the screen (plus a margin for its width), so a line with a far-off
+// end costs only the part that's visible. Returns 0 when nothing is left.
+#define CLIP_M 8
+static int outcode(int x, int y) {
+    return (x < -CLIP_M) | ((x > SCREEN_W + CLIP_M) << 1) | ((y < -CLIP_M) << 2) | ((y > SCREEN_H + CLIP_M) << 3);
+}
+
+static int clip(int *x0, int *y0, int *x1, int *y1) {
+    int c0 = outcode(*x0, *y0), c1 = outcode(*x1, *y1);
+    while (c0 | c1) {
+        if (c0 & c1) return 0;
+        int c = c0 ? c0 : c1;
+        long long dx = *x1 - *x0, dy = *y1 - *y0;   // 64-bit: far-off ends overflow 32-bit products
+        int x, y;
+        if (c & 8)      { y = SCREEN_H + CLIP_M; x = *x0 + (int)(dx * (y - *y0) / dy); }
+        else if (c & 4) { y = -CLIP_M;           x = *x0 + (int)(dx * (y - *y0) / dy); }
+        else if (c & 2) { x = SCREEN_W + CLIP_M; y = *y0 + (int)(dy * (x - *x0) / dx); }
+        else            { x = -CLIP_M;           y = *y0 + (int)(dy * (x - *x0) / dx); }
+        if (c == c0) { *x0 = x; *y0 = y; c0 = outcode(x, y); }
+        else         { *x1 = x; *y1 = y; c1 = outcode(x, y); }
+    }
+    return 1;
+}
+
 IWRAM_CODE static void raster(const Line *l, int camX, int camY) {
     int x0 = l->x0 - camX, y0 = l->y0 - camY, x1 = l->x1 - camX, y1 = l->y1 - camY;
-    if ((x0 < -8 && x1 < -8) || (x0 > SCREEN_W + 8 && x1 > SCREEN_W + 8) ||
-        (y0 < -8 && y1 < -8) || (y0 > SCREEN_H + 8 && y1 > SCREEN_H + 8)) return;
+    if (!clip(&x0, &y0, &x1, &y1)) return;
     int dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
     int dy = y1 > y0 ? y1 - y0 : y0 - y1, sy = y0 < y1 ? 1 : -1;
     int lo = -(l->width - 1) / 2, hi = lo + l->width;

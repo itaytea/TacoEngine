@@ -7,11 +7,7 @@
 
 #include "gba.h"
 
-#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
-typedef int bool;           // C23 (GCC's default) has bool/true/false built in
-#define true 1
-#define false 0
-#endif
+#include <stdbool.h>        // bool/true/false (built in from C23; this covers older compilers)
 #ifndef NULL
 #define NULL ((void *)0)
 #endif
@@ -263,7 +259,15 @@ struct Entity {
     u16 vramTile;               // first tile of the frame on screen (in a shared frame slot)
     s16 frameSlot, shownFrame;  // shared frame slot (-1 = none), and which sprite frame it holds
     u8 palBank, started, dying;
+    u16 gen;                    // counts reuses of this slot (see EntityHandle)
 };
+
+// A reference to an entity that you can keep across frames. Entity slots are reused after destroy(),
+// so a stored Entity * can end up pointing at a different, newer entity; entity_get() returns NULL
+// instead once the entity it was made from is gone.
+typedef struct { Entity *e; u16 gen; } EntityHandle;
+EntityHandle entity_handle(Entity *e);          // a handle to e (NULL e gives an empty handle)
+Entity *entity_get(EntityHandle h);             // the entity, or NULL if it was destroyed (or the handle is empty)
 
 #define SCRIPT(Name) struct Name##__fields   // field list is read by the editor (see script_types.h)
 

@@ -11,6 +11,8 @@ extern const ScriptType *const script_types[];   // generated, indexed by SCRIPT
 static u32 vram_used[1024 / 32];
 static const SpriteAsset *pal_owner[16];
 static u8 pal_refs[16];
+static u16 pal_dirty;              // banks whose colors are copied to palette RAM at the next vblank
+u16 engine_warnings;               // WARN_* bits, shown by the frame budget overlay
 
 int vram_alloc(int tiles) {
     int run = 0;
@@ -43,6 +45,8 @@ void vram_free(int start, int tiles) {
     for (int k = start; k < start + tiles; k++) vram_used[k >> 5] &= ~(1u << (k & 31));
 }
 
+// A palette bank holding this sprite's colors (shared by everything showing the same sprite),
+// or PAL_NONE when all 16 are taken. The colors reach palette RAM at the next vblank.
 int pal_acquire(const SpriteAsset *s) {
     for (int i = 0; i < 16; i++)
         if (pal_refs[i] && pal_owner[i] == s) { pal_refs[i]++; return i; }
@@ -50,14 +54,22 @@ int pal_acquire(const SpriteAsset *s) {
         if (!pal_refs[i]) {
             pal_owner[i] = s;
             pal_refs[i] = 1;
-            for (int c = 0; c < 16; c++) PAL_OBJ[i * 16 + c] = s->palette[c];
+            pal_dirty |= (u16)(1u << i);
             return i;
         }
-    return 0;
+    engine_warnings |= WARN_PALETTES;
+    return PAL_NONE;
 }
 
 void pal_release(int bank) {
-    if (pal_refs[bank]) pal_refs[bank]--;
+    if (bank >= 0 && bank < 16 && pal_refs[bank]) pal_refs[bank]--;
+}
+
+// In vblank
+static void pal_commit(void) {
+    for (int i = 0; pal_dirty; i++, pal_dirty >>= 1)
+        if ((pal_dirty & 1) && pal_refs[i])
+            for (int c = 0; c < 16; c++) PAL_OBJ[i * 16 + c] = pal_owner[i]->palette[c];
 }
 
 // ---- Shared sprite frames ----
@@ -69,8 +81,9 @@ void pal_release(int bank) {
 static struct { const SpriteAsset *s; s16 frame; u16 tile, tiles; u8 refs; } frames[MAX_FRAMES];
 
 #define MAX_DMA 48
+#define DMA_BUDGET 4096            // 32-bit words of sprite frames uploaded per vblank (16 KB); more waits a frame
 static struct { const u32 *src; u32 *dst; u16 words; } dma_queue[MAX_DMA];
-static int dma_count;
+static int dma_count, dma_words;
 
 // A slot holding this frame (shared if another entity already shows it), or -1 if memory is full
 static int frame_acquire(const SpriteAsset *s, int frame) {
@@ -79,10 +92,11 @@ static int frame_acquire(const SpriteAsset *s, int frame) {
         if (frames[i].refs && frames[i].s == s && frames[i].frame == frame) { frames[i].refs++; return i; }
         if (!frames[i].refs && empty < 0) empty = i;
     }
-    if (empty < 0 || dma_count >= MAX_DMA) return -1;
+    if (empty < 0) { engine_warnings |= WARN_SPRITE_MEMORY; return -1; }
+    if (dma_count >= MAX_DMA || dma_words + s->frameWords > DMA_BUDGET) return -1;   // shown next frame
     int tiles = s->frameWords / 8;
     int at = tiles >= 64 ? vram_alloc_high(tiles) : vram_alloc(tiles);
-    if (at < 0) return -1;
+    if (at < 0) { engine_warnings |= WARN_SPRITE_MEMORY; return -1; }
     frames[empty].s = s;
     frames[empty].frame = (s16)frame;
     frames[empty].tile = (u16)at;
@@ -92,6 +106,7 @@ static int frame_acquire(const SpriteAsset *s, int frame) {
     dma_queue[dma_count].dst = OBJ_VRAM + at * 8;
     dma_queue[dma_count].words = s->frameWords;
     dma_count++;
+    dma_words += s->frameWords;
     return empty;
 }
 
@@ -114,24 +129,29 @@ void entities_reset(void) {
     for (int i = 0; i < MAX_FRAMES; i++) frames[i].refs = 0;
     for (int i = 0; i < 1024 / 32; i++) vram_used[i] = 0;
     for (int i = 0; i < 16; i++) pal_refs[i] = 0;
+    pal_dirty = 0;
     contact_count = 0;
     body_reset_all();
 }
 
 static void set_sprite(Entity *e, const SpriteAsset *s) {
     e->sprite = s;
-    e->frameSlot = e->shownFrame = -1;   // sprite memory is taken when it's first drawn on screen
-    if (s) e->palBank = (u8)pal_acquire(s);
+    // Sprite memory and a palette bank are taken when it's first drawn on screen
+    e->frameSlot = e->shownFrame = -1;
+    e->palBank = PAL_NONE;
 }
 
 Entity *entity_spawn_template(const EntityTemplate *t, int x, int y, u16 id) {
     Entity *e = NULL;
     for (int i = 0; i < MAX_ENTITIES; i++)
         if (!entities[i].alive) { e = &entities[i]; break; }
-    if (!e || !t) return NULL;
+    if (!t) return NULL;
+    if (!e) { engine_warnings |= WARN_ENTITIES; return NULL; }
     if (e - entities + 1 > high) high = (int)(e - entities) + 1;
+    u16 gen = (u16)(e->gen + 1);
     u8 *raw = (u8 *)e;
     for (unsigned k = 0; k < sizeof(Entity); k++) raw[k] = 0;
+    e->gen = gen;
     e->alive = 1;
     e->tmpl = t;
     e->name = t->name;
@@ -149,7 +169,7 @@ Entity *entity_spawn_template(const EntityTemplate *t, int x, int y, u16 id) {
     e->colH = t->colH;
     e->colFlags = t->colFlags;
     set_sprite(e, t->sprite);
-    if (t->platformer) e->body = body_alloc(t->platformer, t->bodyFlags);
+    if (t->platformer && !(e->body = body_alloc(t->platformer, t->bodyFlags))) engine_warnings |= WARN_BODIES;
     e->scriptCount = t->scriptCount > MAX_SCRIPTS ? MAX_SCRIPTS : t->scriptCount;
     for (int i = 0; i < e->scriptCount; i++) {
         const ScriptInit *si = &t->scripts[i];
@@ -198,12 +218,23 @@ void entities_flush_destroyed(void) {
         for (int s = 0; s < e->scriptCount; s++)
             if (e->scripts[s].type->on_destroy) e->scripts[s].type->on_destroy(e->scripts[s].data, e);
         frame_release(e->frameSlot);
-        if (e->sprite) pal_release(e->palBank);
+        pal_release(e->palBank);
         if (e->body) body_free(e->body);
         e->alive = 0;
         contacts_forget(i);
     }
     while (high && !entities[high - 1].alive) high--;
+}
+
+// ---- Handles ----
+
+EntityHandle entity_handle(Entity *e) {
+    EntityHandle h = { e, e ? e->gen : 0 };
+    return h;
+}
+
+Entity *entity_get(EntityHandle h) {
+    return h.e && h.e->alive && !h.e->dying && h.e->gen == h.gen ? h.e : NULL;
 }
 
 // ---- Queries ----
@@ -394,11 +425,15 @@ void entities_render(int camX, int camY) {
         int sx = e->flipX ? px - (s->w - s->pivotX) : px - s->pivotX;
         int sy = py - s->pivotY;
         if (e->hidden || sx <= -s->w || sx >= SCREEN_W || sy <= -s->h || sy >= SCREEN_H) {
-            // Not drawn: give its sprite memory back (it's loaded again when it shows up)
+            // Not drawn: give its sprite memory and palette back (they're loaded again when it shows up)
             frame_release(e->frameSlot);
             e->frameSlot = e->shownFrame = -1;
+            pal_release(e->palBank);
+            e->palBank = PAL_NONE;
             continue;
         }
+        if (e->palBank != PAL_NONE && pal_owner[e->palBank] != s) { pal_release(e->palBank); e->palBank = PAL_NONE; }
+        if (e->palBank == PAL_NONE && (e->palBank = (u8)pal_acquire(s)) == PAL_NONE) continue;   // all 16 banks in use
         const SpriteAnim *a = e->anim < s->animCount ? &s->anims[e->anim] : NULL;
         int frame = a && a->count ? a->frames[e->frame < a->count ? e->frame : a->count - 1] : 0;
         if (frame != e->shownFrame) {
@@ -436,8 +471,9 @@ void entities_render(int camX, int camY) {
 }
 
 void entities_commit(void) {
+    pal_commit();
     for (int i = 0; i < dma_count; i++) dma_copy32(dma_queue[i].dst, dma_queue[i].src, dma_queue[i].words);
-    dma_count = 0;
+    dma_count = dma_words = 0;
     for (int i = 0; i < 128; i++) {
         OAM[i * 4 + 0] = oam_shadow[i * 4 + 0];
         OAM[i * 4 + 1] = oam_shadow[i * 4 + 1];

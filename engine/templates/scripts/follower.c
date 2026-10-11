@@ -8,7 +8,7 @@ SCRIPT(Follower) {
     int lag;          // = 6 Higher = lazier, floatier following (1 = snaps into place)
     int height;       // = -6 Float this many px above the one it follows (negative = up)
     bool bob;         // = true Bob gently up and down while following
-    Entity *leader;   // @hide  who it follows: the player, or the follower in front of it
+    EntityHandle leader;   // @hide  who it follows: the player, or the follower in front of it
     int phase;        // @hide
 };
 
@@ -21,7 +21,7 @@ static Entity *end_of_line(Entity *player, Entity *self) {
             Entity *o = entity_at(i);
             if (!o || o == self) continue;
             Follower *f = get_script(o, Follower);
-            if (f && f->leader == last) next = o;
+            if (f && entity_get(f->leader) == last) next = o;
         }
         if (!next) return last;
         last = next;
@@ -30,15 +30,14 @@ static Entity *end_of_line(Entity *player, Entity *self) {
 }
 
 void Follower_OnTrigger(Follower *self, Entity *e, Entity *other) {
-    if (self->leader || !has_tag(other, TAG_Player)) return;
-    self->leader = end_of_line(other, e);
+    if (entity_get(self->leader) || !has_tag(other, TAG_Player)) return;
+    self->leader = entity_handle(end_of_line(other, e));
     self->phase = rand_int(0, 255);
 }
 
 void Follower_Update(Follower *self, Entity *e) {
-    Entity *lead = self->leader;
+    Entity *lead = entity_get(self->leader);   // NULL once the leader is destroyed, even if its slot is reused
     if (!lead) return;
-    if (!lead->alive) { self->leader = NULL; return; }   // leader gone (destroyed): stop here
 
     // Target: `distance` px behind the leader, on the side we're already on
     int lx = ex(lead), ly = ey(lead) + self->height;

@@ -103,11 +103,13 @@ void text_clear(void) {
 }
 
 void text_clear_row(int y) {
+    if (y < 0 || y >= 32) return;
     u16 *map = SCREENBLOCK(TEXT_SBB);
     for (int x = 0; x < 32; x++) map[y * 32 + x] = 0;
 }
 
 static void put(int x, int y, const char *s, int pal) {
+    if (y < 0 || y >= 32 || !s) return;   // outside the text map
     u16 *map = SCREENBLOCK(TEXT_SBB);
     for (; *s && x < 30; s++, x++) {
         unsigned char c = (unsigned char)*s;

@@ -33,6 +33,14 @@ typedef volatile u32   vu32;
 #define REG_BLDALPHA  IO16(0x052)
 #define REG_BLDY      IO16(0x054)
 #define REG_KEYINPUT  IO16(0x130)
+#define REG_DISPSTAT  IO16(0x004)
+#define REG_IE        IO16(0x200)
+#define REG_IF        IO16(0x202)
+#define REG_IME       IO16(0x208)
+#define REG_IFBIOS    (*(volatile u16 *)0x03007FF8)          // interrupt flags the BIOS waits on
+#define REG_ISR_MAIN  (*(void (**)(void))0x03007FFC)        // interrupt handler (ARM code)
+#define DSTAT_VBL_IRQ 0x0008
+#define IRQ_VBLANK    0x0001
 #define REG_WAITCNT   IO16(0x204)
 // Sound
 #define REG_SOUNDCNT_L IO16(0x080)
@@ -97,9 +105,9 @@ static inline void dma_copy32(void *dst, const void *src, u32 words) {
     REG_DMA3CNT = words | DMA_ENABLE | DMA_32;
 }
 
+// Sleep until the next vblank (BIOS VBlankIntrWait; needs the vblank interrupt set up in main.c)
 static inline void vsync(void) {
-    while (REG_VCOUNT >= 160) {}
-    while (REG_VCOUNT < 160) {}
+    __asm__ volatile("swi 0x05" ::: "r0", "r1", "r2", "r3", "memory");
 }
 
 #endif

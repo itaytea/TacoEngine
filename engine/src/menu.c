@@ -77,7 +77,7 @@ bool menu_update(void) {
     if (mode == MENU_NONE) {
         if (menu_settings.pauseEnabled && key_pressed(KEY_START) && !dialogue_active()) {
             open_pause();
-            input_pressed = input_held = 0;
+            input_pressed = input_held = input_released = 0;   // scripts don't see it (raw state is kept in main.c)
             return true;
         }
         return false;
@@ -89,7 +89,7 @@ bool menu_update(void) {
     if (moved) { play_sound(menu_settings.cursorSound); draw(); }
     bool back = mode == MENU_PAUSE && key_pressed(KEY_START | KEY_B);
     bool pick = key_pressed(KEY_A) || (mode == MENU_TITLE && key_pressed(KEY_START));
-    input_pressed = input_held = 0;   // the menu has the buttons
+    input_pressed = input_held = input_released = 0;   // the menu has the buttons
     if (back) { close_menu(); return false; }
     if (pick) {
         play_sound(menu_settings.confirmSound);

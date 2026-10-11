@@ -46,7 +46,15 @@ void entities_flush_destroyed(void);
 // sprite memory (entity.c)
 int vram_alloc(int tiles);
 void vram_free(int start, int tiles);
-int pal_acquire(const SpriteAsset *s);
+// Limits hit recently, shown by the frame budget overlay
+#define WARN_PALETTES      0x01
+#define WARN_SPRITE_MEMORY 0x02
+#define WARN_ENTITIES      0x04
+#define WARN_BODIES        0x08
+extern u16 engine_warnings;
+
+#define PAL_NONE 0xFF
+int pal_acquire(const SpriteAsset *s);   // PAL_NONE when all 16 banks are in use
 void pal_release(int bank);
 
 // dialogue.c

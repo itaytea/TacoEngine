@@ -13,19 +13,20 @@ int tilemap_w, tilemap_h;
 static int drawn_cx = -9999, drawn_cy = -9999;
 
 void tilemap_load(const Scene *s) {
-    tilemap_w = s->w;
-    tilemap_h = s->h;
-    int n = s->w * s->h;
-    if (n > MAX_CELLS) n = MAX_CELLS;
+    tilemap_w = s->w > 256 ? 256 : s->w;
+    tilemap_h = s->h > 256 ? 256 : s->h;
+    int n = tilemap_w * tilemap_h;
     for (int i = 0; i < n; i++) map[i] = s->map ? s->map[i] : 0;
+    // Clear the visible map before replacing the tiles, so the old map never shows the new tiles
+    // (tile 0 is empty in every tileset)
+    u16 *m = SCREENBLOCK(MAP_SBB);
+    for (int i = 0; i < 4 * 1024; i++) m[i] = 0;
     tileset = s->tileset;
     if (tileset) {
         dma_copy32(CHARBLOCK(MAP_CBB), tileset->gfx, tileset->gfxWords);
         for (int i = 0; i < tileset->palCount * 16 && i < 10 * 16; i++) PAL_BG[16 + i] = tileset->palettes[i];
     }
     PAL_BG[0] = s->bgColor;
-    u16 *m = SCREENBLOCK(MAP_SBB);
-    for (int i = 0; i < 4 * 1024; i++) m[i] = 0;
     REG_BG1CNT = BG_PRIO(2) | BG_CBB(MAP_CBB) | BG_SBB(MAP_SBB) | (3 << 14);
     drawn_cx = drawn_cy = -9999;
 }
@@ -72,13 +73,17 @@ static void draw_cell(int cx, int cy) {
 void tilemap_draw(int camX, int camY) {
     int cx0 = camX >> 4, cy0 = camY >> 4;
     if (cx0 != drawn_cx || cy0 != drawn_cy) {
-        // Redraw only the newly exposed column/row when scrolling by one cell
-        if (drawn_cy == cy0 && (cx0 == drawn_cx + 1 || cx0 == drawn_cx - 1)) {
-            int col = cx0 > drawn_cx ? cx0 + 15 : cx0;
-            for (int cy = cy0; cy <= cy0 + 10; cy++) draw_cell(col, cy);
-        } else if (drawn_cx == cx0 && (cy0 == drawn_cy + 1 || cy0 == drawn_cy - 1)) {
-            int row = cy0 > drawn_cy ? cy0 + 10 : cy0;
-            for (int cx = cx0; cx <= cx0 + 15; cx++) draw_cell(cx, row);
+        // Redraw only the newly exposed column and/or row when scrolling by one cell on either axis
+        int ddx = cx0 - drawn_cx, ddy = cy0 - drawn_cy;
+        if (ddx >= -1 && ddx <= 1 && ddy >= -1 && ddy <= 1) {
+            if (ddx) {
+                int col = ddx > 0 ? cx0 + 15 : cx0;
+                for (int cy = cy0; cy <= cy0 + 10; cy++) draw_cell(col, cy);
+            }
+            if (ddy) {
+                int row = ddy > 0 ? cy0 + 10 : cy0;
+                for (int cx = cx0; cx <= cx0 + 15; cx++) draw_cell(cx, row);
+            }
         } else {
             for (int cy = cy0; cy <= cy0 + 10; cy++)
                 for (int cx = cx0; cx <= cx0 + 15; cx++) draw_cell(cx, cy);

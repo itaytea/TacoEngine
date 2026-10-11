@@ -158,7 +158,7 @@ static int portrait_current_frame(void) {
 
 void dialogue_render_portrait(u16 *oam) {
     oam[0] = ATTR0_HIDE;
-    if (!active || !portrait || portrait_tile < 0) return;
+    if (!active || !portrait || portrait_tile < 0 || portrait_pal == PAL_NONE) return;
     int interiorW = (st->boxW - 2) * 8;
     int px = (st->boxX + 1) * 8 + (st->portraitRight ? interiorW - portrait->w - 4 : 4);
     int py = (st->boxY + 1) * 8 + ((st->boxH - 2) * 8 - portrait->h) / 2;
@@ -185,7 +185,8 @@ static void layout_page(void) {
         if (c == 0x07) { Glyph g = {(s16)x, (u8)y, 0, 0, 0, *p++}; glyphs[glyph_count++] = g; continue; }
         if (c == 0x08) {
             char num[12];
-            text_itoa(vars[*p++], num);
+            u8 v = *p++;
+            text_itoa(v < var_count ? vars[v] : 0, num);
             for (char *n = num; *n && glyph_count < MAX_CHARS; n++) {
                 Glyph g = {(s16)x, (u8)y, (u8)*n, (u8)flags, (u8)color, 0};
                 glyphs[glyph_count++] = g;

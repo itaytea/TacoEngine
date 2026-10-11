@@ -10,12 +10,24 @@ static int scene_index = -1, pending_scene = -1;
 static int debug_overlay;
 
 // ---- Input ----
+// raw_held is the real button state; input_* is what scripts see, which menus can clear for a frame
+// without a held button then counting as a new press.
+
+static u16 raw_held;
+static u32 rng = 0x2F6E2B1u;
+static int rng_seeded;
 
 static void read_input(void) {
     u16 keys = (u16)(~REG_KEYINPUT & KEY_MASK);
-    input_pressed = keys & ~input_held;
-    input_released = input_held & ~keys;
-    input_held = keys;
+    input_pressed = keys & ~raw_held;
+    input_released = raw_held & ~keys;
+    input_held = raw_held = keys;
+    if (!rng_seeded && input_pressed) {
+        // Seed the random numbers from when the player first presses a button, so each run differs
+        rng ^= (u32)frame_counter * 2654435761u ^ ((u32)REG_VCOUNT << 16);
+        if (!rng) rng = 1;
+        rng_seeded = 1;
+    }
 }
 
 bool key_held(u16 k) { return (input_held & k) != 0; }
@@ -80,8 +92,6 @@ void set_background(u16 color) { PAL_BG[0] = color; }
 
 // ---- Utilities ----
 
-static u32 rng = 0x2F6E2B1u;
-
 int rand_int(int lo, int hi) {
     rng ^= rng << 13;
     rng ^= rng >> 17;
@@ -127,11 +137,39 @@ static void draw_debug(int cpuLines) {
     text_print(17, 19, "%");
     text_print(20, 19, "ENT");
     text_print(24, 19, text_itoa(alive, buf));
+    // Limits hit in the last two seconds
+    // (row 18 is only touched while there's a warning, so menus can use it otherwise)
+    static int warn_timer, warn_shown;
+    if (engine_warnings || warn_shown) text_clear_row(18);
+    warn_shown = engine_warnings != 0;
+    if (engine_warnings & WARN_PALETTES) text_print_hi(0, 18, "16 SPRITE PALETTES FULL");
+    else if (engine_warnings & WARN_SPRITE_MEMORY) text_print_hi(0, 18, "SPRITE MEMORY FULL");
+    else if (engine_warnings & WARN_ENTITIES) text_print_hi(0, 18, "ENTITY LIMIT (96) HIT");
+    else if (engine_warnings & WARN_BODIES) text_print_hi(0, 18, "PLATFORMER BODY LIMIT (8) HIT");
+    if (++warn_timer >= 120) { warn_timer = 0; engine_warnings = 0; }
 }
 
 // ---- Main loop ----
 
+// ---- Waiting for vblank ----
+// The CPU sleeps in the BIOS until the vblank interrupt instead of spinning, which saves battery.
+
+IWRAM_CODE static void irq_handler(void) {
+    u16 f = REG_IF & REG_IE;
+    REG_IFBIOS |= f;    // tells VBlankIntrWait the interrupt happened
+    REG_IF = f;         // acknowledge
+}
+
+static void irq_init(void) {
+    REG_IME = 0;
+    REG_ISR_MAIN = irq_handler;
+    REG_DISPSTAT |= DSTAT_VBL_IRQ;
+    REG_IE = IRQ_VBLANK;
+    REG_IME = 1;
+}
+
 int main(void) {
+    irq_init();
     REG_WAITCNT = 0x4317;   // faster cartridge access (3/1 wait states) with prefetch, as almost every game does
     REG_DISPCNT = DCNT_MODE0 | DCNT_OBJ_1D | DCNT_BG0 | DCNT_BG1 | DCNT_OBJ;
     for (int i = 0; i < 128; i++) OAM[i * 4] = ATTR0_HIDE;
