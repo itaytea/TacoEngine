@@ -10,7 +10,8 @@ public struct Palette16 {
         var counts: [UInt16: Int] = [:]
         for img in images { for p in img.pixels where p.isOpaque { counts[p.rgb15, default: 0] += 1 } }
         if counts.count <= 15 {
-            colors = counts.keys.sorted { counts[$0]! > counts[$1]! }
+            // Most used first; ties by color value, so the same art always gives the same palette
+            colors = counts.keys.sorted { (counts[$0]!, $1) > (counts[$1]!, $0) }
         } else {
             reduced = true
             colors = Palette16.medianCut(counts, target: 15)
@@ -42,7 +43,7 @@ public struct Palette16 {
     }
 
     static func medianCut(_ counts: [UInt16: Int], target: Int) -> [UInt16] {
-        var boxes: [[(UInt16, Int)]] = [counts.map { ($0.key, $0.value) }]
+        var boxes: [[(UInt16, Int)]] = [counts.map { ($0.key, $0.value) }.sorted { $0.0 < $1.0 }]   // fixed order: builds are reproducible
         while boxes.count < target {
             // Split the box with the widest channel range (weighted by pixel count)
             var bestBox = -1, bestScore = 0, bestChannel = 0
@@ -59,7 +60,7 @@ public struct Palette16 {
             let ch = bestChannel
             let sorted = boxes[bestBox].sorted { a, b in
                 let ca = comps(a.0), cb = comps(b.0)
-                return (ch == 0 ? ca.0 : ch == 1 ? ca.1 : ca.2) < (ch == 0 ? cb.0 : ch == 1 ? cb.1 : cb.2)
+                return ((ch == 0 ? ca.0 : ch == 1 ? ca.1 : ca.2), a.0) < ((ch == 0 ? cb.0 : ch == 1 ? cb.1 : cb.2), b.0)
             }
             let total = sorted.reduce(0) { $0 + $1.1 }
             var acc = 0, split = 1
