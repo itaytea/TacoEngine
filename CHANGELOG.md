@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Performance**: measured on a 28-entity scene with a rope, the frame went from about 70–73% to 66–67% of the CPU.
+  - Trigger checks sort collider boxes by x in internal RAM and only test boxes that overlap horizontally, instead of every pair of entities in work RAM (8.8% of the frame down to 2.7%).
+  - `draw_line` fills each tile row a run at a time with one masked write instead of plotting pixel by pixel, and short lines skip clipping (which needed 64-bit divisions). Mostly horizontal and thick lines gain the most; in the measured scene, a mostly vertical rope, the cost stayed about the same.
+  - `play()` checks the animation that's already playing first, so calling it every frame with the same name costs one string compare.
+  - Hot loops no longer compile into calls to `memcpy`/`memset`, which run from ROM.
+
 ## 1.0
 
 First public release.

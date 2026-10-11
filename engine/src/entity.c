@@ -121,6 +121,10 @@ static void frame_release(int slot) {
 static struct { u8 a, b; } contacts[MAX_CONTACTS];
 static int contact_count;
 
+typedef struct { s16 x0, y0, x1, y1; u8 index, trigger; } TriggerBox;
+static TriggerBox boxes[MAX_ENTITIES];   // this frame's collider boxes (internal RAM)
+static u8 order[MAX_ENTITIES];           // boxes sorted by x0 (sorting indices: swapping structs would call ROM memcpy)
+
 // ---- Lifecycle ----
 
 void entities_reset(void) {
@@ -240,6 +244,7 @@ Entity *entity_get(EntityHandle h) {
 // ---- Queries ----
 
 static int str_eq(const char *a, const char *b) {
+    if (a == b) return a != NULL;
     if (!a || !b) return 0;
     while (*a && *a == *b) { a++; b++; }
     return *a == *b;
@@ -311,6 +316,8 @@ void play_index(Entity *e, int anim) {
 
 void play(Entity *e, const char *name) {
     if (!e->sprite) return;
+    // Scripts call this every frame with the animation that's already playing: check that one first
+    if (e->anim < e->sprite->animCount && str_eq(e->sprite->anims[e->anim].name, name)) return;
     for (int i = 0; i < e->sprite->animCount; i++)
         if (str_eq(e->sprite->anims[i].name, name)) { play_index(e, i); return; }
 }
@@ -362,20 +369,33 @@ static void update_triggers(void) {
             i++;
         }
     }
-    // New contacts (at least one side must be a trigger), among entities that have colliders
-    u8 list[MAX_ENTITIES];
+    // New contacts (at least one side must be a trigger), among entities that have colliders.
+    // Their boxes are copied into a small array sorted by left edge, so each one is only tested
+    // against the ones that start before it ends, without reading the big entities in work RAM.
     int n = 0;
-    for (int i = 0; i < high; i++)
-        if (entities[i].alive && !entities[i].dying && (entities[i].colFlags & COLLIDER_ON)) list[n++] = (u8)i;
+    for (int i = 0; i < high; i++) {
+        Entity *e = &entities[i];
+        if (!e->alive || e->dying || !(e->colFlags & COLLIDER_ON)) continue;
+        TriggerBox *t = &boxes[n];
+        t->x0 = (s16)(FX_INT(e->x) + e->colX);
+        t->y0 = (s16)(FX_INT(e->y) + e->colY);
+        t->x1 = (s16)(t->x0 + e->colW);
+        t->y1 = (s16)(t->y0 + e->colH);
+        t->index = (u8)i;
+        t->trigger = (e->colFlags & COLLIDER_TRIGGER) != 0;
+        int k = n++;
+        for (; k > 0 && boxes[order[k - 1]].x0 > t->x0; k--) order[k] = order[k - 1];   // insertion sort
+        order[k] = (u8)(n - 1);
+    }
     for (int p = 0; p < n; p++) {
-        int i = list[p];
-        Entity *a = &entities[i];
-        for (int q = p + 1; q < n; q++) {
-            int j = list[q];
-            Entity *b = &entities[j];
+        const TriggerBox *bp = &boxes[order[p]];
+        for (int q = p + 1; q < n && boxes[order[q]].x0 < bp->x1; q++) {
+            const TriggerBox *bq = &boxes[order[q]];
+            if (!(bp->trigger | bq->trigger) || bq->y0 >= bp->y1 || bp->y0 >= bq->y1) continue;
+            int i = bp->index < bq->index ? bp->index : bq->index, j = bp->index ^ bq->index ^ i;
+            Entity *a = &entities[i], *b = &entities[j];
             if (!b->alive || b->dying || !a->alive || a->dying) continue;   // a trigger may have destroyed one
-            if (!((a->colFlags | b->colFlags) & COLLIDER_TRIGGER)) continue;
-            if (!overlaps(a, b)) continue;
+            if (!overlaps(a, b)) continue;                                   // or moved one
             int known = 0;
             for (int c = 0; c < contact_count; c++)
                 if (contacts[c].a == i && contacts[c].b == j) { known = 1; break; }

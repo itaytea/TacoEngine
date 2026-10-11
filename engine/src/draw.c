@@ -55,20 +55,27 @@ static inline __attribute__((always_inline)) u32 *tile_for(int cell) {
     slot[cell] = (u8)t;
     cell_of[t - 1] = (u16)cell;
     u32 *p = &pool[(t - 1) * 8];
-    for (int i = 0; i < 8; i++) p[i] = 0;
+    p[0] = p[1] = p[2] = p[3] = p[4] = p[5] = p[6] = p[7] = 0;   // (a loop compiles to a call to ROM memset)
     return p;
 }
 
-typedef struct { int cell; u32 *tile; u32 color; } Pen;
-
-static inline __attribute__((always_inline)) void plot(Pen *pen, int x, int y) {
-    if ((unsigned)x >= SCREEN_W || (unsigned)y >= SCREEN_H) return;
-    int cell = (y >> 3) * MAP_W + (x >> 3);
-    if (cell != pen->cell) { pen->cell = cell; pen->tile = tile_for(cell); }   // neighbors share a tile
-    if (!pen->tile) return;
-    u32 *row = pen->tile + (y & 7);
-    int sh = (x & 7) * 4;
-    *row = (*row & ~(15u << sh)) | (pen->color << sh);
+// A horizontal run of pixels x0..x1 on row y, in `pat` (the color in all 8 nibbles). A tile row is
+// one 32-bit word, so each tile the run crosses takes a single masked write.
+static inline __attribute__((always_inline)) void hspan(int x0, int x1, int y, u32 pat) {
+    if ((unsigned)y >= SCREEN_H) return;
+    if (x0 < 0) x0 = 0;
+    if (x1 >= SCREEN_W) x1 = SCREEN_W - 1;
+    int base = (y >> 3) * MAP_W;
+    for (int x = x0; x <= x1;) {
+        int end = (x | 7) < x1 ? (x | 7) : x1;          // last pixel of the run in this tile
+        u32 *tile = tile_for(base + (x >> 3));
+        if (tile) {
+            u32 mask = (~0u << ((x & 7) * 4)) & (~0u >> ((7 - (end & 7)) * 4));
+            u32 *row = tile + (y & 7);
+            *row = (*row & ~mask) | (pat & mask);
+        }
+        x = end + 1;
+    }
 }
 
 // Cohen-Sutherland: cut a line to the screen (plus a margin for its width), so a line with a far-off
@@ -80,6 +87,10 @@ static int outcode(int x, int y) {
 
 static int clip(int *x0, int *y0, int *x1, int *y1) {
     int c0 = outcode(*x0, *y0), c1 = outcode(*x1, *y1);
+    // A short line (like one of a rope's segments) is cheaper to walk than to cut, since cutting
+    // takes 64-bit divisions in ROM and the spans skip whatever is off screen anyway
+    int dx = *x1 - *x0, dy = *y1 - *y0;
+    if (!(c0 & c1) && dx < 128 && dx > -128 && dy < 128 && dy > -128) return 1;
     while (c0 | c1) {
         if (c0 & c1) return 0;
         int c = c0 ? c0 : c1;
@@ -101,17 +112,37 @@ IWRAM_CODE static void raster(const Line *l, int camX, int camY) {
     int dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
     int dy = y1 > y0 ? y1 - y0 : y0 - y1, sy = y0 < y1 ? 1 : -1;
     int lo = -(l->width - 1) / 2, hi = lo + l->width;
-    int xMajor = dx >= dy;
     int err = dx - dy;
-    Pen pen = { -1, NULL, l->color };
-    for (;;) {
-        // Thickness: a span across the line's main direction
-        if (xMajor) for (int k = lo; k < hi; k++) plot(&pen, x0, y0 + k);
-        else for (int k = lo; k < hi; k++) plot(&pen, x0 + k, y0);
-        if (x0 == x1 && y0 == y1) break;
-        int e2 = err * 2;
-        if (e2 > -dy) { err -= dy; x0 += sx; }
-        if (e2 < dx) { err += dx; y0 += sy; }
+    u32 pat = l->color * 0x11111111u;
+    if (dx >= dy) {
+        // Mostly horizontal: thickness is vertical. Gather the pixels Bresenham puts on one row into a
+        // run and draw it once per row of thickness when the line steps to the next row.
+        int runX = x0;
+        for (;;) {
+            int done = x0 == x1 && y0 == y1, nx = x0, ny = y0;
+            if (!done) {
+                int e2 = err * 2;
+                if (e2 > -dy) { err -= dy; nx += sx; }
+                if (e2 < dx) { err += dx; ny += sy; }
+            }
+            if (done || ny != y0) {
+                int a = runX < x0 ? runX : x0, b = runX < x0 ? x0 : runX;
+                for (int k = lo; k < hi; k++) hspan(a, b, y0 + k, pat);
+                runX = nx;
+            }
+            if (done) break;
+            x0 = nx;
+            y0 = ny;
+        }
+    } else {
+        // Mostly vertical: thickness is horizontal, one run per row
+        for (;;) {
+            hspan(x0 + lo, x0 + hi - 1, y0, pat);
+            if (x0 == x1 && y0 == y1) break;
+            int e2 = err * 2;
+            if (e2 > -dy) { err -= dy; x0 += sx; }
+            if (e2 < dx) { err += dx; y0 += sy; }
+        }
     }
 }
 
