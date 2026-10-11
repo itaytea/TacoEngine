@@ -104,7 +104,7 @@ public enum Codegen {
         for snd in sounds {
             let symName = soundSym[snd.name]!
             c.line("extern const s8 \(symName)_data[];")
-            c.line("const SoundAsset \(symName) = { \(cString(snd.name)), \(symName)_data, \(snd.samples) };")
+            c.line("const SoundAsset \(symName) = { .name = \(cString(snd.name)), .data = \(symName)_data, .length = \(snd.samples) };")
             let stamp = Int(SoundConverter.modified(snd.raw)?.timeIntervalSince1970 ?? 0)   // changes when the sound is reconverted
             asm += "    .align 2\n    .global \(symName)_data\n\(symName)_data:   @ \(stamp)\n    .incbin \"\(snd.raw.path)\"\n"
         }
@@ -167,20 +167,20 @@ public enum Codegen {
             }
             c.line("static const SpriteAnim \(name)_anims[] = {")
             for (i, an) in anims.enumerated() {
-                c.line("    { \(cString(an.name)), \(name)_a\(i), \(max(1, an.frames.count)), \(max(0, min(60, an.fps))), \(an.loop ? 1 : 0) },")
+                c.line("    { .name = \(cString(an.name)), .frames = \(name)_a\(i), .count = \(max(1, an.frames.count)), .fps = \(max(0, min(60, an.fps))), .loop = \(an.loop ? 1 : 0) },")
             }
             c.line("};")
             if let obj = single {
-                c.line("const SpriteAsset \(name) = { \(cString(stored.name)), \(obj.0), \(obj.1), \(obj.2), \(obj.3), \(a.pivotX), \(a.pivotY), \(frameTiles * 8), \(frames.count), \(name)_gfx, \(name)_pal, \(anims.count), \(name)_anims, 0, NULL };")
+                c.line("const SpriteAsset \(name) = { .name = \(cString(stored.name)), .w = \(obj.0), .h = \(obj.1), .objShape = \(obj.2), .objSize = \(obj.3), .pivotX = \(a.pivotX), .pivotY = \(a.pivotY), .frameWords = \(frameTiles * 8), .frameCount = \(frames.count), .gfx = \(name)_gfx, .palette = \(name)_pal, .animCount = \(anims.count), .anims = \(name)_anims, .pieceCount = 0, .pieces = NULL };")
             } else {
                 c.line("static const SpritePiece \(name)_pieces[] = {")
                 var tile = 0
                 for pc in pieces {
-                    c.line("    { \(pc.x), \(pc.y), \(pc.obj.0), \(pc.obj.1), \(pc.obj.2), \(pc.obj.3), \(tile) },")
+                    c.line("    { .x = \(pc.x), .y = \(pc.y), .w = \(pc.obj.0), .h = \(pc.obj.1), .objShape = \(pc.obj.2), .objSize = \(pc.obj.3), .tile = \(tile) },")
                     tile += pc.obj.0 * pc.obj.1 / 64
                 }
                 c.line("};")
-                c.line("const SpriteAsset \(name) = { \(cString(stored.name)), \(fw), \(fh), 0, 0, \(a.pivotX), \(a.pivotY), \(frameTiles * 8), \(frames.count), \(name)_gfx, \(name)_pal, \(anims.count), \(name)_anims, \(pieces.count), \(name)_pieces };")
+                c.line("const SpriteAsset \(name) = { .name = \(cString(stored.name)), .w = \(fw), .h = \(fh), .objShape = 0, .objSize = 0, .pivotX = \(a.pivotX), .pivotY = \(a.pivotY), .frameWords = \(frameTiles * 8), .frameCount = \(frames.count), .gfx = \(name)_gfx, .palette = \(name)_pal, .animCount = \(anims.count), .anims = \(name)_anims, .pieceCount = \(pieces.count), .pieces = \(name)_pieces };")
             }
             c.line()
         }
@@ -200,11 +200,14 @@ public enum Codegen {
             func fx(_ d: Double) -> Int { Int((d * 256).rounded()) }
             func fr(_ i: Int) -> Int { max(0, min(255, i)) }
             c.line("static const PlatformerSettings \(platSym[id]!) = {")
-            c.line("    \(fx(v.runSpeed)), \(fx(v.groundAccel)), \(fx(v.groundDecel)), \(fx(v.groundTurn)), \(fx(v.airAccel)), \(fx(v.airDecel)), \(fx(v.airTurn)),")
-            c.line("    \(fx(v.gravity)), \(fx(v.jumpVelocity)), \(fx(v.jumpCut)), \(fx(v.apexThreshold)), \(fx(v.apexGravity)), \(fx(v.fallGravity)), \(fx(v.maxFall)),")
-            c.line("    \(fx(v.wallSlideMax)), \(fx(v.wallJumpX)), \(fx(v.wallJumpY)),")
-            c.line("    \(fr(v.coyoteFrames)), \(fr(v.bufferFrames)), \(fr(v.wallCoyoteFrames)), \(fr(v.wallJumpLockFrames)), \(v.wallJumps ? 1 : 0),")
-            c.line("    \(fr(v.jumpSustainFrames)), \(fr(v.wallReach)), \(fr(v.airJumps)), \(fx(v.jumpBoostX)), \(fx(v.overspeedDecel)), \(fx(v.fastFallMax)), \(v.autoAnimate ? 1 : 0) };")
+            c.line("    .runSpeed = \(fx(v.runSpeed)), .groundAccel = \(fx(v.groundAccel)), .groundDecel = \(fx(v.groundDecel)), .groundTurn = \(fx(v.groundTurn)),")
+            c.line("    .airAccel = \(fx(v.airAccel)), .airDecel = \(fx(v.airDecel)), .airTurn = \(fx(v.airTurn)),")
+            c.line("    .gravity = \(fx(v.gravity)), .jumpVelocity = \(fx(v.jumpVelocity)), .jumpCut = \(fx(v.jumpCut)), .apexThreshold = \(fx(v.apexThreshold)),")
+            c.line("    .apexGravity = \(fx(v.apexGravity)), .fallGravity = \(fx(v.fallGravity)), .maxFall = \(fx(v.maxFall)),")
+            c.line("    .wallSlideMax = \(fx(v.wallSlideMax)), .wallJumpX = \(fx(v.wallJumpX)), .wallJumpY = \(fx(v.wallJumpY)),")
+            c.line("    .coyoteFrames = \(fr(v.coyoteFrames)), .bufferFrames = \(fr(v.bufferFrames)), .wallCoyoteFrames = \(fr(v.wallCoyoteFrames)), .wallJumpLockFrames = \(fr(v.wallJumpLockFrames)),")
+            c.line("    .wallJumps = \(v.wallJumps ? 1 : 0), .jumpSustainFrames = \(fr(v.jumpSustainFrames)), .wallReach = \(fr(v.wallReach)), .airJumps = \(fr(v.airJumps)),")
+            c.line("    .jumpBoostX = \(fx(v.jumpBoostX)), .overspeedDecel = \(fx(v.overspeedDecel)), .fastFallMax = \(fx(v.fastFallMax)), .autoAnimate = \(v.autoAnimate ? 1 : 0) };")
         }
         c.line()
 
@@ -212,10 +215,10 @@ public enum Codegen {
         for sc in scripts {
             func cb(_ n: String, _ sig: String) -> String { sc.callbacks.contains(n) ? "(\(sig))\(sc.name)_\(n)" : "0" }
             c.line("_Static_assert(sizeof(\(sc.name)) <= SCRIPT_DATA_BYTES, \"Script \(sc.name) has too many fields (max 128 bytes)\");")
-            c.line("static const ScriptType script_type_\(sc.name) = { \(cString(sc.name)), sizeof(\(sc.name)), "
-                   + cb("Start", "void (*)(void *, Entity *)") + ", " + cb("Update", "void (*)(void *, Entity *)") + ", "
-                   + cb("OnTrigger", "void (*)(void *, Entity *, Entity *)") + ", " + cb("OnTriggerExit", "void (*)(void *, Entity *, Entity *)") + ", "
-                   + cb("OnMessage", "void (*)(void *, Entity *, int, int)") + ", " + cb("OnDestroy", "void (*)(void *, Entity *)") + " };")
+            c.line("static const ScriptType script_type_\(sc.name) = { .name = \(cString(sc.name)), .size = sizeof(\(sc.name)), "
+                   + ".start = " + cb("Start", "void (*)(void *, Entity *)") + ", .update = " + cb("Update", "void (*)(void *, Entity *)") + ", "
+                   + ".on_trigger = " + cb("OnTrigger", "void (*)(void *, Entity *, Entity *)") + ", .on_trigger_exit = " + cb("OnTriggerExit", "void (*)(void *, Entity *, Entity *)") + ", "
+                   + ".on_message = " + cb("OnMessage", "void (*)(void *, Entity *, int, int)") + ", .on_destroy = " + cb("OnDestroy", "void (*)(void *, Entity *)") + " };")
         }
         c.line("const ScriptType *const script_types[] = { " + (scripts.isEmpty ? "0" : scripts.map { "&script_type_\($0.name)" }.joined(separator: ", ")) + " };")
         c.line()
@@ -269,7 +272,7 @@ public enum Codegen {
                     }
                 }
                 c.line("static const \(sc.name) \(t)_s\(i) = { \(parts.isEmpty ? "0" : parts.joined(separator: ", ")) };")
-                inits.append("{ &script_type_\(sc.name), &\(t)_s\(i) }")
+                inits.append("{ .type = &script_type_\(sc.name), .init = &\(t)_s\(i) }")
             }
             if !inits.isEmpty { c.line("static const ScriptInit \(t)_scripts[] = { \(inits.joined(separator: ", ")) };") }
             var spr = "0", anim = 0, flags = 0, prio = 1
@@ -279,17 +282,17 @@ public enum Codegen {
                 flags = (sp.flipX ? 1 : 0) | (sp.hidden ? 2 : 0)
                 prio = sp.priority
             }
-            var col = "0, 0, 0, 0, 0"
+            var col = ".colX = 0, .colY = 0, .colW = 0, .colH = 0, .colFlags = 0"
             if let cl = def.collider {
-                col = "\(cl.x), \(cl.y), \(max(1, min(255, cl.w))), \(max(1, min(255, cl.h))), \(1 | (cl.trigger ? 2 : 0) | (cl.platform ? 4 : 0))"
+                col = ".colX = \(cl.x), .colY = \(cl.y), .colW = \(max(1, min(255, cl.w))), .colH = \(max(1, min(255, cl.h))), .colFlags = \(1 | (cl.trigger ? 2 : 0) | (cl.platform ? 4 : 0))"
             }
-            var plat = "0, 0"
+            var plat = ".platformer = 0, .bodyFlags = 0"
             if let pl = def.platformer {
-                if let ps = pl.settings.flatMap({ platSym[$0] }) { plat = "&\(ps), \(pl.joypad ? 1 : 0)" }
+                if let ps = pl.settings.flatMap({ platSym[$0] }) { plat = ".platformer = &\(ps), .bodyFlags = \(pl.joypad ? 1 : 0)" }
                 else { warnings.append("\(name): Platformer has no settings asset — it won't move.") }
                 if def.collider == nil { warnings.append("\(name): Platformer works best with a Collider (used as its hitbox).") }
             }
-            c.line("\(isStatic ? "static " : "")const EntityTemplate \(t) = { \(cString(name)), \(tag), \(flags), \(prio), \(spr), \(anim), \(col), \(plat), \(inits.count), \(inits.isEmpty ? "0" : "\(t)_scripts") };")
+            c.line("\(isStatic ? "static " : "")const EntityTemplate \(t) = { .name = \(cString(name)), .tag = \(tag), .flags = \(flags), .priority = \(prio), .sprite = \(spr), .anim = \(anim), \(col), \(plat), .scriptCount = \(inits.count), .scripts = \(inits.isEmpty ? "0" : "\(t)_scripts") };")
             return t
         }
 
@@ -319,7 +322,7 @@ public enum Codegen {
                 else { t = emitTemplate(def, name: e.name, symbol: nil, isStatic: true, sceneIDs: ids) }
                 let w = sc.worldPosition(of: e)
                 let parent = e.parent.flatMap { ids[$0] } ?? 0
-                rows.append("{ &\(t), \(w.x), \(w.y), \(i + 1), \(parent) }")
+                rows.append("{ .tmpl = &\(t), .x = \(w.x), .y = \(w.y), .id = \(i + 1), .parent = \(parent) }")
             }
             if !rows.isEmpty {
                 c.line("static const SceneEntity \(sn)_entities[] = {")
@@ -331,7 +334,7 @@ public enum Codegen {
             let ts = sc.tileset.flatMap { tilesetSym[$0] }.map { "&\($0)" } ?? "0"
             let mode = ["follow": 0, "screens": 1, "fixed": 2][sc.cameraMode.rawValue] ?? 0
             let target = sc.cameraTarget.flatMap { ids[$0] } ?? 0
-            c.line("static const Scene \(sn) = { \(cString(stored.name)), \(sc.width), \(sc.height), \(sn)_map, \(ts), 0x\(String(format: "%04X", bg)), \(rows.count), \(rows.isEmpty ? "0" : "\(sn)_entities"), \(mode), \(target), \(soundRef(sc.music)) };")
+            c.line("static const Scene \(sn) = { .name = \(cString(stored.name)), .w = \(sc.width), .h = \(sc.height), .map = \(sn)_map, .tileset = \(ts), .bgColor = 0x\(String(format: "%04X", bg)), .entityCount = \(rows.count), .entities = \(rows.isEmpty ? "0" : "\(sn)_entities"), .cameraMode = \(mode), .cameraTarget = \(target), .music = \(soundRef(sc.music)) };")
             c.line()
         }
         c.line("const Scene *const scenes[] = { \(sceneSyms.map { "&\($0)" }.joined(separator: ", ")) };")
@@ -347,9 +350,9 @@ public enum Codegen {
         let startIndex = p.sceneIndex(s.startScene) ?? 0
         let titleScene = menu?.titleScene.flatMap { p.sceneIndex($0) } ?? -1
         let titleOn = menu?.titleEnabled == true
-        c.line("const MenuSettings menu_settings = { \(titleOn ? 1 : 0), \(menu?.pauseEnabled == true ? 1 : 0), "
-               + "\(cString((menu?.title.isEmpty ?? true) ? s.name.uppercased() : menu!.title.uppercased())), \(cString((menu?.subtitle ?? "").uppercased())), "
-               + "\(titleScene), \(startIndex), \(soundRef(menu?.music)), \(soundRef(menu?.cursorSound)), \(soundRef(menu?.confirmSound)) };")
+        c.line("const MenuSettings menu_settings = { .titleEnabled = \(titleOn ? 1 : 0), .pauseEnabled = \(menu?.pauseEnabled == true ? 1 : 0), "
+               + ".title = \(cString((menu?.title.isEmpty ?? true) ? s.name.uppercased() : menu!.title.uppercased())), .subtitle = \(cString((menu?.subtitle ?? "").uppercased())), "
+               + ".titleScene = \(titleScene), .startScene = \(startIndex), .music = \(soundRef(menu?.music)), .cursorSound = \(soundRef(menu?.cursorSound)), .confirmSound = \(soundRef(menu?.confirmSound)) };")
         let bootTitle: Bool
         if case .start = boot { bootTitle = titleOn } else { bootTitle = false }
         c.line("const int boot_title = \(bootTitle ? 1 : 0);")
@@ -402,7 +405,7 @@ public enum Codegen {
             if let s = fontSyms[key] { return s }
             let f = font(for: style, in: p)
             let name = "FONT_\(fontSyms.count)"
-            c.line("static const Font \(name) = { \(f.height), { \(f.widths.map(String.init).joined(separator: ",")) }, {")
+            c.line("static const Font \(name) = { .height = \(f.height), .widths = { \(f.widths.map(String.init).joined(separator: ",")) }, .bits = {")
             for g in 0..<96 { c.line("    { \(f.rows[g].map { String(format: "0x%04X", $0) }.joined(separator: ",")) },") }
             c.line("} };")
             fontSyms[key] = name
@@ -430,8 +433,9 @@ public enum Codegen {
             for i in 0..<6 { colors[4 + i] = rgb15(i < st.rainbow.count ? st.rainbow[i] : "#FFFFFF") }
             colors[10] = rgb15(st.fillColor)
             for (i, n) in TextBoxStyleAsset.colorNames.enumerated() { colors[11 + i] = rgb15(st.colors[n] ?? TextBoxStyleAsset.defaultColors[n]!) }
-            c.line("static const TextBoxStyle \(name) = { \(geo.boxX), \(geo.boxY), \(geo.boxW), \(geo.boxH), \(geo.nameX), \(geo.nameY), \(geo.nameW), \(geo.padX), \(geo.padY), \(st.lines), \(max(1, min(255, st.speed))), \(st.portraitRight ? 1 : 0), \(st.pauseGame ? 1 : 0), \(st.shadow ? 1 : 0),")
-            c.line("    { \(colors.map { String(format: "0x%04X", $0) }.joined(separator: ", ")) }, \(name)_frame, \(name)_framepal, &\(fs) };")
+            c.line("static const TextBoxStyle \(name) = { .boxX = \(geo.boxX), .boxY = \(geo.boxY), .boxW = \(geo.boxW), .boxH = \(geo.boxH), .nameX = \(geo.nameX), .nameY = \(geo.nameY), .nameW = \(geo.nameW),")
+            c.line("    .padX = \(geo.padX), .padY = \(geo.padY), .lines = \(st.lines), .speed = \(max(1, min(255, st.speed))), .portraitRight = \(st.portraitRight ? 1 : 0), .pauseGame = \(st.pauseGame ? 1 : 0), .shadow = \(st.shadow ? 1 : 0),")
+            c.line("    .colors = { \(colors.map { String(format: "0x%04X", $0) }.joined(separator: ", ")) }, .frameGfx = \(name)_frame, .framePal = \(name)_framepal, .font = &\(fs) };")
             styleSyms[key] = name
             return name
         }
@@ -439,7 +443,7 @@ public enum Codegen {
         for (id, s) in p.speakers.sorted(by: { $0.value.name < $1.value.name }) {
             let name = sym("SPEAKER_", s.name)
             let portrait = s.value.portrait.flatMap { spriteSym[$0] }.map { "&\($0)" } ?? "0"
-            c.line("static const Speaker \(name) = { \(cString(s.value.displayName)), 0x\(String(format: "%04X", rgb15(s.value.nameColor))), \(portrait) };")
+            c.line("static const Speaker \(name) = { .name = \(cString(s.value.displayName)), .nameColor = 0x\(String(format: "%04X", rgb15(s.value.nameColor))), .portrait = \(portrait) };")
             speakerSyms[id] = name
         }
         for (id, d) in p.dialogues.sorted(by: { $0.value.name < $1.value.name }) {
@@ -462,11 +466,11 @@ public enum Codegen {
                     idle = anims.firstIndex { $0.name == sp.idleAnimation } ?? talk
                 }
                 let spk = l.speaker.flatMap { speakerSyms[$0] }.map { "&\($0)" } ?? "0"
-                lines.append("{ \(spk), \(talk), \(idle), \(name)_t\(i) }")
+                lines.append("{ .speaker = \(spk), .talkAnim = \(talk), .idleAnim = \(idle), .text = \(name)_t\(i) }")
             }
             if lines.isEmpty { warnings.append("Dialogue \(d.name) has no lines.") }
             c.line("static const DialogueLine \(name)_lines[] = { \(lines.isEmpty ? "{ 0, 0, 0, (const u8 *)\"\" }" : lines.joined(separator: ", ")) };")
-            c.line("const Dialogue \(name) = { \(cString(d.name)), &\(ss), \(lines.count), \(name)_lines };")
+            c.line("const Dialogue \(name) = { .name = \(cString(d.name)), .style = &\(ss), .lineCount = \(lines.count), .lines = \(name)_lines };")
             c.line()
         }
     }
@@ -518,7 +522,7 @@ public enum Codegen {
         // Graphics, de-duplicated
         var words = [UInt32](repeating: 0, count: 8)   // hw tile 0 stays empty
         var seen: [[UInt32]: Int] = [:]
-        var defs: [String] = ["{ 0, 0, 0, 0, 16, 16, 0, 1 }"]   // map index 0 = empty
+        var defs: [String] = ["{ .collision = 0, .flags = 0, .hx = 0, .hy = 0, .hw = 16, .hh = 16, .gfxTile = 0, .pal = 1 }"]   // map index 0 = empty
         for i in 0..<count {
             let bank = bankOf[i]
             let gfx = tileColors[i].isEmpty ? [UInt32](repeating: 0, count: 32) : tiles4bpp(tiles[i], palette: palettes.isEmpty ? Palette16(images: []) : palettes[bank])
@@ -533,7 +537,7 @@ public enum Codegen {
             var f = 0
             for name in props.flags { if let bit = flagNames.firstIndex(of: name) { f |= 1 << bit } }
             let hb = props.hitbox ?? [0, 0, 16, 16]
-            defs.append("{ \(coll), \(f), \(hb[0]), \(hb[1]), \(hb[2]), \(hb[3]), \(first), \(bank + 1) }")
+            defs.append("{ .collision = \(coll), .flags = \(f), .hx = \(hb[0]), .hy = \(hb[1]), .hw = \(hb[2]), .hh = \(hb[3]), .gfxTile = \(first), .pal = \(bank + 1) }")
         }
         if words.count / 8 > 1024 { throw GenError(message: "Tileset \(stored.name) has too many unique tiles for VRAM (max 255).") }
         c.line("static const u32 \(name)_gfx[] = {")
@@ -546,7 +550,7 @@ public enum Codegen {
         c.line("static const TileDef \(name)_defs[] = {")
         for d in defs { c.line("    \(d),") }
         c.line("};")
-        c.line("static const Tileset \(name) = { \(cString(stored.name)), \(defs.count), \(name)_defs, \(name)_gfx, \(words.count), \(palettes.count), \(name)_pal };")
+        c.line("static const Tileset \(name) = { .name = \(cString(stored.name)), .count = \(defs.count), .defs = \(name)_defs, .gfx = \(name)_gfx, .gfxWords = \(words.count), .palCount = \(palettes.count), .palettes = \(name)_pal };")
         c.line()
     }
 
