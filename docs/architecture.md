@@ -44,14 +44,14 @@ docs/                  user documentation and this page
 At boot `main()` sets `REG_WAITCNT` to the fast cartridge timing (3/1 wait states with prefetch). Then every frame:
 
 1. `vsync()`: sleeps in the BIOS (`VBlankIntrWait`) until the vblank interrupt, set up by `irq_init()`
-2. In vblank: `sound_commit()` (points DMA1 at the buffer mixed last frame), `entities_commit()` (OAM + sprite frame DMA), `dialogue_commit()`, `draw_commit()`, `background_commit()` (scroll and colors), `tilemap_draw()` (stream new map columns/rows)
+2. In vblank: `entities_commit()` (OAM + sprite frame DMA), `dialogue_commit()`, `draw_commit()`, `background_commit()` (scroll and colors), `tilemap_draw()` (stream new map columns/rows)
 3. `read_input()`: `input_held / input_pressed / input_released`
 4. `menu_update()` (returns true while the pause menu freezes the world), `dialogue_update()`
 5. `entities_update()`, unless a menu, a camera screen-slide or a pausing dialogue is running:
    scripts' `Start` (first frame) and `Update` → `body_step()` for every platformer body → animation → trigger enter/exit
 6. `entities_flush_destroyed()` (children of destroyed entities go too), `camera_update()`, `scene_apply_pending()`, `save_apply_pending()`, `menu_apply_pending()`
 7. `entities_render()` fills the OAM shadow and `draw_render()` rasterizes this frame's lines; both are uploaded at the next vblank
-8. `sound_update()` mixes the next 224 samples, then the frame budget overlay is drawn if it's on
+8. `sound_update()` mixes the next 224 samples (the timer 1 interrupt starts playing them), then the frame budget overlay is drawn if it's on
 
 At boot, before the loop: `sound_init()`, `save_init()`, then the title menu (`menu_boot()`) if it's enabled, otherwise the boot scene.
 
@@ -71,7 +71,7 @@ BG palette banks: 0 backdrop (entries 1–15: `draw_line` colors), 1–10 tilese
 
 ### Sound (`sound.c`)
 
-Timer 0 overflows at 13379 Hz, exactly 224 samples per 59.73 Hz frame, and drives Direct Sound A's FIFO through DMA1. Two 224-byte buffers alternate: each vblank `sound_commit` restarts DMA1 on the one mixed during the previous frame, and `sound_update` mixes the other (an `IWRAM_CODE` loop adding signed 8-bit samples times volume). Sound data is converted by the editor (`Sound.swift`, through macOS `afconvert`) to raw s8 at that rate and pulled into the ROM with `.incbin` from `build/generated/sounds.s`, so the runtime never resamples. With nothing playing, mixing stops after both buffers are silent.
+Timer 0 overflows at 13379 Hz, exactly 224 samples per 59.73 Hz frame, and drives Direct Sound A's FIFO through DMA1. Timer 1 counts timer 0's overflows and interrupts every 224 samples; the handler (`sound_irq`) starts the next buffer, so buffer changes follow the audio rather than the main loop and a long frame can't let the DMA run on into other memory. At each change the FIFO is reset and pre-filled with the buffer's first 16 bytes, so bytes the DMA read ahead past the old buffer are never played. There are two 224-byte buffers: one plays while `sound_update` mixes the other (an `IWRAM_CODE` loop adding signed 8-bit samples times volume) and marks it ready; if a frame runs late and nothing is ready, the playing buffer repeats. Sound data is converted by the editor (`Sound.swift`, through macOS `afconvert`) to raw s8 at that rate and pulled into the ROM with `.incbin` from `build/generated/sounds.s`, so the runtime never resamples.
 
 ### Saves (`save.c`) and menus (`menu.c`)
 

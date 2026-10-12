@@ -82,7 +82,7 @@ void background_reset(void);                // after the tileset is loaded
 
 // sound.c
 void sound_init(void);
-void sound_commit(void);                    // in vblank
+IWRAM_CODE void sound_irq(void);            // timer 1 interrupt
 void sound_update(void);                    // once per frame: mix the next buffer
 
 // save.c

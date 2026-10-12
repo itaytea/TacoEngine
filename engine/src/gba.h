@@ -41,6 +41,7 @@ typedef volatile u32   vu32;
 #define REG_ISR_MAIN  (*(void (**)(void))0x03007FFC)        // interrupt handler (ARM code)
 #define DSTAT_VBL_IRQ 0x0008
 #define IRQ_VBLANK    0x0001
+#define IRQ_TIMER1    0x0010
 #define REG_WAITCNT   IO16(0x204)
 // Sound
 #define REG_SOUNDCNT_L IO16(0x080)
@@ -52,6 +53,9 @@ typedef volatile u32   vu32;
 #define REG_DMA1CNT_H  IO16(0x0C6)
 #define REG_TM0CNT_L   IO16(0x100)
 #define REG_TM0CNT_H   IO16(0x102)
+#define REG_TM1CNT_L   IO16(0x104)
+#define REG_TM1CNT_H   IO16(0x106)
+#define FIFO_A_DATA    (*(vu32 *)0x040000A0)
 
 #define REG_DMA3SAD   IO32(0x0D4)
 #define REG_DMA3DAD   IO32(0x0D8)

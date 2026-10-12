@@ -1,11 +1,17 @@
 // Sound: one music channel and four sound-effect channels, mixed in software into 8-bit samples and
-// played through Direct Sound A. Timer 0 runs the output at 13379 Hz, which is exactly 224 samples
-// per frame, so each vblank the DMA is pointed at the buffer mixed during the previous frame while
-// the next one is mixed. Sounds are already at that rate (the editor converts them), so mixing is
-// just adding samples.
+// played through Direct Sound A. Timer 0 runs the output at 13379 Hz, exactly 224 samples per frame.
+//
+// Timer 1 counts the samples actually played and interrupts every 224 of them; the handler starts the
+// next buffer. So buffer changes follow the audio itself, not the main loop: a long frame (loading a
+// scene) can't let the DMA run on into unrelated memory, which plays as loud noise. The FIFO is
+// cleared and pre-filled at each change, so bytes the DMA read ahead past the old buffer are never
+// heard. Two buffers: one playing, the other mixed while it plays; the mixer only writes when no
+// buffer is waiting, so it never touches one the interrupt might switch to. Sounds are already at the output rate (the editor converts
+// them), so mixing is just adding samples.
 #include "internal.h"
 
 #define BUF          224        // samples per frame at 13379 Hz
+#define NBUF         2
 #define SFX_CHANNELS 4
 
 typedef struct {
@@ -17,18 +23,45 @@ typedef struct {
 static Channel music, sfx[SFX_CHANNELS];
 static int next_sfx;
 static int music_vol = 16, sfx_vol = 16;
-static s8 buffers[2][BUF] __attribute__((aligned(4)));
-static int which;               // the buffer being mixed this frame
-static int idle;                // both buffers are silent
+static s8 buffers[NBUF][BUF] __attribute__((aligned(4)));
+static u8 silent[NBUF];                 // the buffer holds only zeros
+static volatile int playing;            // the buffer the DMA is reading
+static volatile int ready = -1;         // mixed and waiting to play (-1 = none yet)
+
+// Start playing buffer b from its first sample
+IWRAM_CODE static void start_buffer(int b) {
+    REG_DMA1CNT_H = 0;
+    REG_SOUNDCNT_H = 0x0B06;            // Direct Sound A, full volume, both speakers, timer 0, FIFO reset
+    const u32 *src = (const u32 *)buffers[b];
+    for (int i = 0; i < 4; i++) FIFO_A_DATA = src[i];   // first 16 bytes now, the DMA does the rest
+    REG_DMA1SAD = (u32)(src + 4);
+    REG_DMA1DAD = REG_FIFO_A;
+    REG_DMA1CNT_H = 0xB640;             // on, FIFO timing, 32-bit, repeat, fixed destination
+}
+
+// Timer 1 interrupt: the playing buffer's 224 samples have all been heard
+IWRAM_CODE void sound_irq(void) {
+    int next = ready >= 0 ? ready : playing;   // nothing new mixed (a long frame): play the last one again
+    ready = -1;
+    playing = next;
+    start_buffer(next);
+}
 
 void sound_init(void) {
     REG_SOUNDCNT_X = 0x0080;    // sound on
-    REG_SOUNDCNT_H = 0x0B06;    // Direct Sound A at full volume, both speakers, timer 0, FIFO reset
+    for (int b = 0; b < NBUF; b++) {
+        for (int i = 0; i < BUF; i++) buffers[b][i] = 0;
+        silent[b] = 1;
+    }
+    playing = 0;
+    ready = -1;
     REG_TM0CNT_H = 0;
+    REG_TM1CNT_H = 0;
     REG_TM0CNT_L = (u16)(65536 - 1254);   // 16.78 MHz / 1254 = 13379 Hz
+    REG_TM1CNT_L = (u16)(65536 - BUF);    // counts timer 0 overflows: one interrupt per buffer
+    start_buffer(0);
+    REG_TM1CNT_H = 0x00C4;                // on, interrupt, count up with timer 0
     REG_TM0CNT_H = 0x0080;
-    for (int i = 0; i < BUF; i++) buffers[0][i] = buffers[1][i] = 0;
-    idle = 1;
 }
 
 // Mixing, run from fast internal RAM
@@ -54,27 +87,21 @@ IWRAM_CODE static void mix(s8 *out) {
     }
 }
 
-// In vblank: start playing the buffer mixed last frame
-void sound_commit(void) {
-    REG_DMA1CNT_H = 0;
-    REG_DMA1SAD = (u32)buffers[which];
-    REG_DMA1DAD = REG_FIFO_A;
-    REG_DMA1CNT_H = 0xB640;     // on, FIFO timing, 32-bit, repeat, fixed destination
-    which ^= 1;
-}
-
-// Once per frame: mix the next buffer
+// Once per frame: mix the next buffer, unless one is already waiting to play
 void sound_update(void) {
+    if (ready >= 0) return;
+    int target = 0;
+    while (target == playing) target++;   // never the one playing (the interrupt only switches to `ready`)
     bool any = music.active;
     for (int i = 0; i < SFX_CHANNELS; i++) any |= sfx[i].active;
-    if (!any) {
-        if (idle >= 2) return;              // both buffers are already silent
-        for (int i = 0; i < BUF; i++) buffers[which][i] = 0;
-        idle++;
-        return;
+    if (any) {
+        mix(buffers[target]);
+        silent[target] = 0;
+    } else if (!silent[target]) {
+        for (int i = 0; i < BUF; i++) buffers[target][i] = 0;
+        silent[target] = 1;
     }
-    idle = 0;
-    mix(buffers[which]);
+    ready = target;
 }
 
 void play_sound(SoundRef s) {

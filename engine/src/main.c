@@ -156,6 +156,7 @@ static void draw_debug(int cpuLines) {
 
 IWRAM_CODE static void irq_handler(void) {
     u16 f = REG_IF & REG_IE;
+    if (f & IRQ_TIMER1) sound_irq();   // next sound buffer
     REG_IFBIOS |= f;    // tells VBlankIntrWait the interrupt happened
     REG_IF = f;         // acknowledge
 }
@@ -164,7 +165,7 @@ static void irq_init(void) {
     REG_IME = 0;
     REG_ISR_MAIN = irq_handler;
     REG_DISPSTAT |= DSTAT_VBL_IRQ;
-    REG_IE = IRQ_VBLANK;
+    REG_IE = IRQ_VBLANK | IRQ_TIMER1;
     REG_IME = 1;
 }
 
@@ -182,7 +183,6 @@ int main(void) {
     while (1) {
         vsync();
         int start = REG_VCOUNT;
-        sound_commit();
         entities_commit();
         dialogue_commit();
         draw_commit();
