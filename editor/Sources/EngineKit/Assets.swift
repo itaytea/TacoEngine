@@ -336,6 +336,27 @@ public struct SceneAsset: Codable, Equatable, Sendable {
         set { if x >= 0 && y >= 0 && x < width && y < height { cells[y * width + x] = UInt8(max(0, min(255, newValue))) } }
     }
 
+    /// Set every cell in the box between two corners (clipped to the map)
+    public mutating func fillRect(_ x0: Int, _ y0: Int, _ x1: Int, _ y1: Int, with tile: Int) {
+        let xa = max(0, min(x0, x1)), xb = min(width - 1, max(x0, x1))
+        let ya = max(0, min(y0, y1)), yb = min(height - 1, max(y0, y1))
+        guard xa <= xb, ya <= yb else { return }
+        for y in ya...yb { for x in xa...xb { self[x, y] = tile } }
+    }
+
+    /// Flood fill: replace the area of same tiles around (x, y), joined by edges, with `tile`
+    public mutating func floodFill(_ x: Int, _ y: Int, with tile: Int) {
+        guard x >= 0, y >= 0, x < width, y < height else { return }
+        let from = self[x, y]
+        guard from != tile else { return }
+        var stack = [(x, y)]
+        while let (cx, cy) = stack.popLast() {
+            guard cx >= 0, cy >= 0, cx < width, cy < height, self[cx, cy] == from else { continue }
+            self[cx, cy] = tile
+            stack.append(contentsOf: [(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)])
+        }
+    }
+
     /// World positions of all entities (one pass)
     public func worldPositions() -> [UUID: (x: Int, y: Int)] {
         var out: [UUID: (x: Int, y: Int)] = [:]

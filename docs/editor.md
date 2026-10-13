@@ -12,7 +12,7 @@ When Taco Engine opens it shows your recent projects. Click one to open it, or c
 
 ## Toolbar
 
-- **Move / Paint / Erase**: the Scene view tool.
+- **Move / Paint / Rectangle / Fill / Erase**: the Scene view tool.
 - **Play** (⌘P) builds and runs the open scene. **Play From Start** (⇧⌘P) runs from the start scene.
 - **⚙** opens Project Settings (tags, tile flags, variables, scene order, menus, frame budget).
 - **Game ▸ Export for Web…** makes a folder that plays the game in a browser (see [Building](building.md#web-export)).
@@ -23,6 +23,7 @@ When Taco Engine opens it shows your recent projects. Click one to open it, or c
 - **+** creates a Platformer Player, a Talking NPC, a ready-made Level End, Enemy or Spikes, an empty entity, a sprite entity, or a prefab instance.
 - Drag entries to reorder them. Later entries draw on top.
 - Drop an entity onto another to make it a **child**: it moves with its parent, in the editor and in the game, and is deleted with it. Its position is shown relative to the parent. Drop it on the strip at the bottom of the list, or right-click ▸ **Un-parent**, to make it top-level again.
+- **Search** filters the list by name, tag, script or prefab name, and shows the matches as a flat list.
 - **⇧-click** selects a range, **⌘-click** adds or removes single entities.
 - Right-click an entity to duplicate it, make it the camera target, create a prefab from it, or apply, revert or unpack prefab overrides.
 
@@ -37,6 +38,9 @@ When Taco Engine opens it shows your recent projects. Click one to open it, or c
 - **Move tool**: click to select, drag to move. 8 px snapping is optional. The selection shows a move gizmo: drag the red arrow to move only along X, the green arrow for only Y, or the yellow square for both. ⇧-click or ⌘-click adds to the selection, and dragging moves every selected entity.
 - **Arrow keys** nudge the selection 1 px (8 px with ⇧).
 - **Paint tool**: draw with the selected palette tile. ⌥-drag erases, ⇧-click picks the tile under the cursor.
+- **Rectangle tool**: drag to fill a box with the selected tile (⌥ to clear the box).
+- **Fill tool**: click to fill the area of matching tiles around the cursor (⌥ to clear it). ⇧-click picks a tile with either tool.
+- **Right-click ▸ Play From Here** builds and runs the open scene with the entity tagged *Player* starting where you clicked. A right-drag still pans.
 - Drag a prefab from the Project panel into the scene to place it.
 - A selected Enemy shows its path as an orange dashed line; drag the **B** handle to set where it walks to.
 - Orange dashed lines show screen edges in *screen by screen* scenes. Green boxes are colliders, yellow dashed boxes are triggers, cyan boxes are platforms.
@@ -48,7 +52,7 @@ When Taco Engine opens it shows your recent projects. Click one to open it, or c
 - **Prefab instances**: values that differ from the prefab show in **bold blue**. Use **Overrides ▸ Apply All to Prefab / Revert All**.
 - **Script fields** come from the script's `SCRIPT(...)` block. Hover a field name to see its comment.
 - With nothing selected, it shows the scene: size, tileset, background, music, camera mode and target.
-- With several entities selected, it lists them and can duplicate or delete them all.
+- With several entities selected, it shows the components they all have and edits all of them at once: a change sets only that value on each entity and leaves the rest alone. Values that differ between them are marked **≠** (the one picked last is shown). Adding or removing a component does it for all of them.
 
 ## Project panel
 

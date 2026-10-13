@@ -66,11 +66,14 @@ final class SceneCamera: ObservableObject {
     var viewSize: CGSize = .zero
     var sceneSize: CGSize = .zero   // px
     var framed: UUID?
+    /// A right-click that didn't pan (view coordinates): the Scene view's context menu
+    var onRightClick: ((CGPoint) -> Void)?
+    private var rightDrag: CGFloat = 0
     private var monitor: Any?
 
     func install() {
         guard monitor == nil else { return }
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .magnify, .rightMouseDragged, .otherMouseDragged]) { [weak self] e in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .magnify, .rightMouseDragged, .otherMouseDragged, .rightMouseDown, .rightMouseUp]) { [weak self] e in
             let input = PointerInput(e)   // local monitors run on the main thread
             let handled = MainActor.assumeIsolated { self?.handle(input) ?? false }
             return handled ? nil : e
@@ -84,7 +87,7 @@ final class SceneCamera: ObservableObject {
 
     /// The parts of an NSEvent the camera needs (plain values, safe to hand across isolation)
     struct PointerInput: Sendable {
-        enum Kind: Sendable { case magnify, scroll, drag, other }
+        enum Kind: Sendable { case magnify, scroll, drag, rightDown, rightUp, other }
         let kind: Kind
         let magnification, dx, dy: CGFloat
         let precise, zoomKey: Bool
@@ -93,6 +96,8 @@ final class SceneCamera: ObservableObject {
             case .magnify: kind = .magnify
             case .scrollWheel: kind = .scroll
             case .rightMouseDragged, .otherMouseDragged: kind = .drag
+            case .rightMouseDown: kind = .rightDown
+            case .rightMouseUp: kind = .rightUp
             default: kind = .other
             }
             magnification = e.type == .magnify ? e.magnification : 0
@@ -121,7 +126,15 @@ final class SceneCamera: ObservableObject {
         case .drag:
             pan.x += e.dx
             pan.y += e.dy
+            rightDrag += abs(e.dx) + abs(e.dy)
             clamp()
+        case .rightDown:
+            rightDrag = 0
+            return false
+        case .rightUp:
+            // Only a click opens the menu: right-dragging pans
+            if rightDrag < 4, let menu = onRightClick { DispatchQueue.main.async { menu(p) } }
+            return false
         case .other:
             return false
         }
@@ -167,6 +180,7 @@ struct SceneViewPanel: View {
     @State private var dragging: Drag?
     @State private var draggingPathEnd: (id: UUID, script: Int, moved: Bool)?   // a Patroller's point B
     @State private var painting = false
+    @State private var rectFrom: (x: Int, y: Int)?   // Rectangle tool: the corner where the drag started
 
     var body: some View {
         if let scene = model.scene {
@@ -240,9 +254,10 @@ struct SceneViewPanel: View {
                 camera.viewSize = geo.size
                 camera.sceneSize = CGSize(width: scene.width * cellSize, height: scene.height * cellSize)
                 camera.install()
+                camera.onRightClick = { p in showContextMenu(CGPoint(x: (p.x - camera.pan.x) / camera.zoom, y: (p.y - camera.pan.y) / camera.zoom)) }
                 if camera.framed != model.openScene { camera.fit(); camera.framed = model.openScene }
             }
-            .onDisappear { camera.remove(); camera.cursor = nil }
+            .onDisappear { camera.remove(); camera.cursor = nil; camera.onRightClick = nil }
             .onChange(of: geo.size) { _, s in camera.viewSize = s }
             .onChange(of: model.openScene) { _, id in
                 if let sc = model.scene { camera.sceneSize = CGSize(width: sc.width * cellSize, height: sc.height * cellSize) }
@@ -360,7 +375,11 @@ struct SceneViewPanel: View {
                 if selected { ctx.draw(Text("B").font(Typo.captionStrong).foregroundColor(.orange), at: CGPoint(x: bp.x + 12, y: bp.y - 10)) }
             }
             if let h = hover, model.tool != .select {
-                let r = CGRect(x: CGFloat(Int(h.x) / 16 * 16) * z, y: CGFloat(Int(h.y) / 16 * 16) * z, width: 16 * z, height: 16 * z)
+                // The cell under the cursor, or the box the Rectangle tool is dragging out
+                let a = rectFrom ?? (Int(h.x) / 16, Int(h.y) / 16), b = (Int(h.x) / 16, Int(h.y) / 16)
+                let r = CGRect(x: CGFloat(min(a.0, b.0) * 16) * z, y: CGFloat(min(a.1, b.1) * 16) * z,
+                               width: CGFloat((abs(a.0 - b.0) + 1) * 16) * z, height: CGFloat((abs(a.1 - b.1) + 1) * 16) * z)
+                if rectFrom != nil { ctx.fill(Path(r), with: .color(.white.opacity(0.2))) }
                 ctx.stroke(Path(r), with: .color(.white), lineWidth: 2)
             }
         }
@@ -379,12 +398,16 @@ struct SceneViewPanel: View {
                     switch model.tool {
                     case .select: dragSelect(scene, start: CGPoint(x: v.startLocation.x / z, y: v.startLocation.y / z), now: p)
                     case .paint, .erase: paint(scene, at: p)
+                    case .fill: if !painting { fill(scene, at: p) }
+                    case .rect: if rectFrom == nil && !painting { startRect(scene, at: p) }
                     }
                 }
-                .onEnded { _ in
+                .onEnded { v in
+                    if let a = rectFrom { endRect(scene, from: a, to: CGPoint(x: v.location.x / z, y: v.location.y / z)) }
                     dragging = nil
                     draggingPathEnd = nil
                     painting = false
+                    rectFrom = nil
                 })
     }
 
@@ -467,6 +490,19 @@ struct SceneViewPanel: View {
 
     static let gizmoLength: CGFloat = 40   // screen px
 
+    /// Right-click in the scene (scene pixels)
+    func showContextMenu(_ p: CGPoint) {
+        guard let sc = model.scene else { return }
+        let inside = p.x >= 0 && p.y >= 0 && p.x < CGFloat(sc.width * cellSize) && p.y < CGFloat(sc.height * cellSize)
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let play = MenuAction.item("Play From Here") { model.playFromHere(p) }
+        play.isEnabled = inside && !model.building
+        play.toolTip = "Build and run this scene with the entity tagged Player starting here"
+        menu.addItem(play)
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+
     func ancestorSelected(_ e: SceneEntity, _ sel: Set<UUID>, _ scene: SceneAsset) -> Bool {
         var p = e.parent, n = 0
         while let pid = p, n < 32 {
@@ -477,16 +513,46 @@ struct SceneViewPanel: View {
         return false
     }
 
+    /// What the tile tools put down: the palette tile, or nothing for Erase and ⌥
+    var tileValue: Int { model.tool == .erase || NSEvent.modifierFlags.contains(.option) ? 0 : model.paintTile }
+
+    /// ⇧-click with a tile tool picks the tile under the cursor; returns whether it did
+    func pickTile(_ scene: SceneAsset, _ cx: Int, _ cy: Int) -> Bool {
+        guard NSEvent.modifierFlags.contains(.shift) else { return false }
+        if scene[cx, cy] > 0 { model.paintTile = scene[cx, cy] }
+        return true
+    }
+
+    func fill(_ scene: SceneAsset, at p: CGPoint) {
+        let cx = Int(p.x) / 16, cy = Int(p.y) / 16
+        painting = true   // one fill per click
+        guard cx >= 0, cy >= 0, cx < scene.width, cy < scene.height, !pickTile(scene, cx, cy), scene[cx, cy] != tileValue else { return }
+        let value = tileValue
+        model.checkpoint()
+        model.updateScene { $0.floodFill(cx, cy, with: value) }
+    }
+
+    func startRect(_ scene: SceneAsset, at p: CGPoint) {
+        let cx = Int(p.x) / 16, cy = Int(p.y) / 16
+        guard cx >= 0, cy >= 0, cx < scene.width, cy < scene.height else { return }
+        if pickTile(scene, cx, cy) { painting = true; return }
+        rectFrom = (cx, cy)
+    }
+
+    func endRect(_ scene: SceneAsset, from a: (x: Int, y: Int), to p: CGPoint) {
+        let bx = Int(floor(p.x / 16)), by = Int(floor(p.y / 16)), value = tileValue
+        var after = scene
+        after.fillRect(a.x, a.y, bx, by, with: value)
+        guard after.cells != scene.cells else { return }
+        model.checkpoint()
+        model.updateScene { $0.fillRect(a.x, a.y, bx, by, with: value) }
+    }
+
     func paint(_ scene: SceneAsset, at p: CGPoint) {
         let cx = Int(p.x) / 16, cy = Int(p.y) / 16
         guard cx >= 0, cy >= 0, cx < scene.width, cy < scene.height else { return }
-        let mods = NSEvent.modifierFlags
-        if mods.contains(.shift) {
-            if scene[cx, cy] > 0 { model.paintTile = scene[cx, cy] }
-            return
-        }
-        let erase = model.tool == .erase || mods.contains(.option)
-        let value = erase ? 0 : model.paintTile
+        if pickTile(scene, cx, cy) { return }
+        let value = tileValue
         guard scene[cx, cy] != value else { return }
         if !painting { model.checkpoint(); painting = true }
         model.updateScene { $0[cx, cy] = value }
@@ -526,5 +592,20 @@ struct TilePalette: View {
         }
         .id(model.artVersion)
         .help("⌥-drag erases · ⇧-click picks a tile from the scene")
+    }
+}
+
+/// An NSMenuItem that runs a closure (the item keeps the closure alive)
+final class MenuAction: NSObject {
+    let run: () -> Void
+    init(_ run: @escaping () -> Void) { self.run = run }
+    @objc func runAction() { run() }
+
+    static func item(_ title: String, _ run: @escaping () -> Void) -> NSMenuItem {
+        let action = MenuAction(run)
+        let item = NSMenuItem(title: title, action: #selector(MenuAction.runAction), keyEquivalent: "")
+        item.target = action
+        item.representedObject = action
+        return item
     }
 }

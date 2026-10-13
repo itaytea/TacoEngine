@@ -69,5 +69,6 @@ static const Scene scene_0 = { .name = "Main", .w = 30, .h = 10, .map = scene_0_
 const Scene *const scenes[] = { &scene_0 };
 const int scene_count = 1;
 const int boot_scene = 0;
+const int boot_player[3] = { 0, 0, 0 };
 const MenuSettings menu_settings = { .titleEnabled = 0, .pauseEnabled = 0, .title = "GOLDEN", .subtitle = "", .titleScene = -1, .startScene = 0, .music = 0, .cursorSound = 0, .confirmSound = 0 };
 const int boot_title = 0;

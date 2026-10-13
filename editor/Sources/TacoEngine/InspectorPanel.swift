@@ -73,15 +73,19 @@ extension InspectorSection where Actions == EmptyView {
 }
 
 /// Label that turns bold+blue when the value overrides the prefab
+/// (or italic with ≠ when it differs between the selected entities)
 struct PropLabel: View {
     let text: String
     var overridden = false
+    var mixed = false
     var body: some View {
-        Text(text)
+        Text(mixed ? text + " ≠" : text)
             .fontWeight(overridden ? .bold : .regular)
+            .italic(mixed)
             .foregroundStyle(overridden ? Tone.prefab : .secondary)
             .frame(width: 92, alignment: .leading)
-            .help(overridden ? "Overrides the prefab's value" : "")
+            .help(mixed ? "Differs between the selected entities (this shows the last one picked). Changing it sets it on all of them."
+                  : overridden ? "Overrides the prefab's value" : "")
     }
 }
 
@@ -165,13 +169,22 @@ struct DefEditor: View {
     @Binding var def: EntityDef
     var overrides: JSON?
     var entityID: UUID?
+    /// Editing several entities: the key paths whose values differ between them
+    var mixed: JSON? = nil
 
     func over(_ path: String...) -> Bool { overrides?.contains(path: path) ?? false }
+    func isMixed(_ path: String...) -> Bool { mixed?.contains(path: path) ?? false }
+
+    /// A row label for the values at these key paths
+    func prop(_ text: String, _ paths: [String]...) -> PropLabel {
+        PropLabel(text: text, overridden: paths.contains { overrides?.contains(path: $0) ?? false },
+                  mixed: paths.contains { mixed?.contains(path: $0) ?? false })
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.md) {
             HStack {
-                PropLabel(text: "Tag", overridden: over("tag"))
+                prop("Tag", ["tag"])
                 Picker("", selection: $def.tag) {
                     Text("Untagged").tag("")
                     ForEach(model.project?.settings.tags ?? [], id: \.self) { Text($0).tag($0) }
@@ -190,9 +203,9 @@ struct DefEditor: View {
         let comp = Binding(get: { def.sprite ?? SpriteComponent() }, set: { def.sprite = $0 })
         let anims = comp.wrappedValue.sprite.flatMap { model.project?.sprites[$0]?.value.animations.map(\.name) } ?? []
         return InspectorSection(title: "Sprite", icon: "photo", actions: { remove { def.sprite = nil } }) {
-            HStack { PropLabel(text: "Sprite", overridden: over("sprite", "sprite")); AssetPicker(kind: .sprite, selection: comp.sprite) }
+            HStack { prop("Sprite", ["sprite", "sprite"]); AssetPicker(kind: .sprite, selection: comp.sprite) }
             HStack {
-                PropLabel(text: "Animation", overridden: over("sprite", "animation"))
+                prop("Animation", ["sprite", "animation"])
                 Picker("", selection: Binding(get: { comp.wrappedValue.animation }, set: { comp.wrappedValue.animation = $0 })) {
                     if !anims.contains(comp.wrappedValue.animation) { Text(comp.wrappedValue.animation.isEmpty ? "(first)" : comp.wrappedValue.animation).tag(comp.wrappedValue.animation) }
                     ForEach(anims, id: \.self) { Text($0).tag($0) }
@@ -200,14 +213,15 @@ struct DefEditor: View {
                 .labelsHidden()
             }
             HStack {
-                PropLabel(text: "Flip X", overridden: over("sprite", "flipX"))
+                prop("Flip X", ["sprite", "flipX"])
                 Toggle("", isOn: comp.flipX).labelsHidden()
                 Spacer()
-                Text("Hidden").foregroundStyle(over("sprite", "hidden") ? Tone.prefab : .secondary)
+                Text(isMixed("sprite", "hidden") ? "Hidden ≠" : "Hidden").italic(isMixed("sprite", "hidden"))
+                    .foregroundStyle(over("sprite", "hidden") ? Tone.prefab : .secondary)
                 Toggle("", isOn: comp.hidden).labelsHidden()
             }
             HStack {
-                PropLabel(text: "Layer", overridden: over("sprite", "priority"))
+                prop("Layer", ["sprite", "priority"])
                 Picker("", selection: comp.priority) {
                     Text("Front").tag(1)
                     Text("With tiles").tag(2)
@@ -225,17 +239,17 @@ struct DefEditor: View {
         let c = Binding(get: { def.collider ?? ColliderComponent() }, set: { def.collider = $0 })
         return InspectorSection(title: "Collider", icon: "square.dashed", actions: { remove { def.collider = nil } }) {
             HStack {
-                PropLabel(text: "Offset", overridden: over("collider", "x") || over("collider", "y"))
+                prop("Offset", ["collider", "x"], ["collider", "y"])
                 IntField(label: "X", value: c.x)
                 IntField(label: "Y", value: c.y)
             }
             HStack {
-                PropLabel(text: "Size", overridden: over("collider", "w") || over("collider", "h"))
+                prop("Size", ["collider", "w"], ["collider", "h"])
                 IntField(label: "W", value: c.w)
                 IntField(label: "H", value: c.h)
             }
             HStack {
-                PropLabel(text: "Type", overridden: over("collider", "trigger") || over("collider", "platform"))
+                prop("Type", ["collider", "trigger"], ["collider", "platform"])
                 Picker("", selection: Binding(get: { c.wrappedValue.trigger ? 1 : c.wrappedValue.platform ? 2 : 0 },
                                               set: { v in var n = c.wrappedValue; n.trigger = v == 1; n.platform = v == 2; c.wrappedValue = n })) {
                     Text("Hitbox").tag(0)
@@ -270,8 +284,8 @@ struct DefEditor: View {
     var platformerSection: some View {
         let c = Binding(get: { def.platformer ?? PlatformerComponent() }, set: { def.platformer = $0 })
         return InspectorSection(title: "Platformer Body", icon: "figure.run", actions: { remove { def.platformer = nil } }) {
-            HStack { PropLabel(text: "Settings", overridden: over("platformer", "settings")); AssetPicker(kind: .platformer, selection: c.settings) }
-            HStack { PropLabel(text: "D-pad control", overridden: over("platformer", "joypad")); Toggle("", isOn: c.joypad).labelsHidden() }
+            HStack { prop("Settings", ["platformer", "settings"]); AssetPicker(kind: .platformer, selection: c.settings) }
+            HStack { prop("D-pad control", ["platformer", "joypad"]); Toggle("", isOn: c.joypad).labelsHidden() }
             if let sid = c.wrappedValue.settings {
                 Button("Tune Movement…") { model.selection = .asset(sid); model.center = .asset(sid) }.controlSize(.small)
             }
@@ -309,7 +323,7 @@ struct DefEditor: View {
             get: { def.scripts.indices.contains(i) ? (def.scripts[i].fields[f.name] ?? f.defaultValue) : nil },
             set: { v in if def.scripts.indices.contains(i) { def.scripts[i].fields[f.name] = v } })
         HStack {
-            PropLabel(text: f.name, overridden: isOver).help(f.help)
+            PropLabel(text: f.name, overridden: isOver, mixed: isMixed("scripts", scriptKey, "fields", f.name)).help(f.help)
             switch f.kind {
             case .int:
                 TextField("", value: Binding(get: { Int(value.wrappedValue?.number ?? 0) }, set: { value.wrappedValue = .number(Double($0)) }), format: .number)
@@ -928,19 +942,37 @@ struct TextBoxInspector: View {
 struct MultiEntityInspector: View {
     @EnvironmentObject var model: EditorModel
 
+    /// The selected entities, the one picked last first (its values are the ones shown), with their components
+    func current() -> [(SceneEntity, EntityDef)] {
+        var ids = model.orderedSelection()
+        if case .entity(let primary) = model.selection, let i = ids.firstIndex(of: primary) { ids.insert(ids.remove(at: i), at: 0) }
+        return ids.compactMap { id in model.entity(id).map { ($0, model.def($0)) } }
+    }
+
     var body: some View {
-        let ids = model.orderedSelection()
+        let list = current()
+        let defs = list.map(\.1)
+        let shared = EntityDef.shared(defs)
+        let mixed = EntityDef.mixed(defs) { script, field in model.project?.script(script)?.fields.first { $0.name == field }?.defaultValue }
         VStack(alignment: .leading, spacing: Space.md) {
-            Label("\(ids.count) objects selected", systemImage: "square.stack.3d.up").font(Typo.heading)
-            VStack(alignment: .leading, spacing: Space.xs) {
-                ForEach(ids, id: \.self) { id in Text(model.entity(id)?.name ?? "?").font(Typo.label).foregroundStyle(.secondary) }
-            }
+            Label("\(list.count) entities selected", systemImage: "square.stack.3d.up").font(Typo.heading)
+            Text(list.map(\.0.name).joined(separator: ", "))
+                .font(Typo.label).foregroundStyle(.secondary).lineLimit(3)
             HStack {
                 Button("Duplicate") { model.duplicateSelection() }
                 Button("Delete", role: .destructive) { model.deleteSelection() }
             }
             .controlSize(.small)
-            Text("Drag them in the Scene view to move them together. ⌘C / ⌘V copy and paste them, keeping links between them (like a switch and the door it opens).")
+            Divider()
+            DefEditor(def: Binding(get: { shared }, set: { new in
+                          // Re-read: the selection may have changed since this view was drawn
+                          let now = current()
+                          let before = EntityDef.shared(now.map(\.1))
+                          model.checkpoint()
+                          for (e, d) in now { model.setDef(e.guid, d.applyingEdit(from: before, to: new)) }
+                      }),
+                      overrides: nil, entityID: list.first?.0.guid, mixed: mixed)
+            Text("Changes apply to every selected entity. Only the components they all have are shown; values marked ≠ differ between them. Drag them in the Scene view to move them together.")
                 .font(Typo.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }

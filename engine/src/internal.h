@@ -20,6 +20,7 @@ extern const int player_tag;                // the "Player" tag (0 = none), for 
 extern const Scene *const scenes[];
 extern const int scene_count;
 extern const int boot_scene;
+extern const int boot_player[3];           // { placed, x, y }: Play From Here puts the player at x, y
 extern const int var_count;
 
 // main.c
@@ -72,6 +73,7 @@ void body_step(Entity *e);
 
 // camera.c
 void camera_reset(const Scene *s, Entity *target);
+Entity *camera_target(void);                // what the camera follows (NULL = nothing)
 void camera_update(void);
 bool camera_paused_world(void);             // during screen slides the world freezes
 extern int cam_x, cam_y;                    // top-left of the view in px (after shake)
@@ -88,6 +90,7 @@ void sound_update(void);                    // once per frame: mix the next buff
 // save.c
 void save_init(void);
 bool save_apply_pending(void);              // end of frame: load a saved game
+void player_place(int x, int y);            // move the Player-tagged entity there, camera included
 
 // menu.c
 void menu_boot(void);                       // open the title menu

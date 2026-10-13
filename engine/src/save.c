@@ -58,6 +58,15 @@ void save_init(void) {
 
 static Entity *player(void) { return player_tag ? find_with_tag(player_tag) : NULL; }
 
+// Put the player at x, y and bring the camera along (loading a save, Play From Here)
+void player_place(int x, int y) {
+    Entity *p = player();
+    if (!p) return;
+    set_position(p, x, y);
+    Entity *t = camera_target();   // the scene's camera target, else the player
+    camera_reset(scene_current, t ? t : p);
+}
+
 bool save_game(int slot) {
     if (slot < 0 || slot >= SLOTS) return false;
     SaveHeader h = { MAGIC, (u16)current_scene(), (u16)var_count, 0, 0, 0, 0, 0 };
@@ -111,11 +120,7 @@ bool save_apply_pending(void) {
     int n = h.varCount < var_count ? h.varCount : var_count;
     sram_read(slot * SLOT_SIZE + (int)sizeof h, vars, n * 4);
     scene_start(h.scene);
-    Entity *p = player();
-    if (p && h.hasPlayer) {
-        set_position(p, h.playerX, h.playerY);
-        camera_reset(scene_current, p);
-    }
+    if (h.hasPlayer) player_place(h.playerX, h.playerY);
     return true;
 }
 

@@ -5,18 +5,28 @@ struct HierarchyPanel: View {
     @EnvironmentObject var model: EditorModel
     @State private var dropTarget: UUID?
     @State private var rootTargeted = false
+    @State private var search = ""
 
     struct Node: Identifiable { let id: UUID; var children: [Node]? }
 
-    /// Entities as a tree (children under their parent, in scene order)
+    /// Entities as a tree (children under their parent, in scene order). While searching: a flat list of matches.
     var tree: [Node] {
         let list = model.scene?.entities ?? []
+        let query = search.trimmingCharacters(in: .whitespaces)
+        if !query.isEmpty { return list.filter { matches($0, query) }.map { Node(id: $0.guid, children: nil) } }
         let ids = Set(list.map(\.guid))
         func kids(_ p: UUID?) -> [Node] {
             list.filter { e in p == nil ? (e.parent.map { !ids.contains($0) } ?? true) : e.parent == p }
                 .map { e in let k = kids(e.guid); return Node(id: e.guid, children: k.isEmpty ? nil : k) }
         }
         return kids(nil)
+    }
+
+    /// Search by name, tag, script or prefab
+    func matches(_ e: SceneEntity, _ q: String) -> Bool {
+        let d = model.def(e)
+        return ([e.name, d.tag] + d.scripts.map(\.script) + [e.prefab.flatMap { model.project?.prefabs[$0]?.name } ?? ""])
+            .contains { $0.localizedCaseInsensitiveContains(q) }
     }
 
     func drop(_ items: [String], onto parent: UUID?) -> Bool {
@@ -34,6 +44,10 @@ struct HierarchyPanel: View {
                 createMenu
             }
             scenePicker
+            TextField("Search", text: $search)
+                .textFieldStyle(.roundedBorder).controlSize(.small)
+                .padding(.horizontal, Space.md).padding(.bottom, Space.sm)
+                .help("Find entities by name, tag, script or prefab")
             Divider()
             // Shift-click selects a range, Cmd-click adds or removes one (macOS list behavior).
             // Drag an entity onto another to make it a child; drag it to the empty space below to make it top-level.
@@ -56,8 +70,8 @@ struct HierarchyPanel: View {
             }
             .listStyle(.sidebar)
             .overlay {
-                if model.scene?.entities.isEmpty ?? true {
-                    Text("No entities")
+                if model.scene?.entities.isEmpty ?? true || tree.isEmpty {
+                    Text(search.isEmpty ? "No entities" : "No matches")
                         .multilineTextAlignment(.center).font(Typo.label).foregroundStyle(.secondary).padding(Space.lg)
                 }
             }
@@ -90,6 +104,7 @@ struct HierarchyPanel: View {
         .menuStyle(.borderlessButton)
         .padding(.horizontal, Space.md)
         .padding(.vertical, Space.sm)
+        .onChange(of: model.openScene) { _, _ in search = "" }
     }
 
     var createMenu: some View {

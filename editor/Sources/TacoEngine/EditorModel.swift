@@ -19,11 +19,15 @@ enum CenterTab: Equatable {
 enum SceneTool: String, CaseIterable {
     case select = "Move"
     case paint = "Paint"
+    case rect = "Rectangle"
+    case fill = "Fill"
     case erase = "Erase"
     var icon: String {
         switch self {
         case .select: "arrow.up.and.down.and.arrow.left.and.right"
         case .paint: "paintbrush.pointed"
+        case .rect: "rectangle.inset.filled"
+        case .fill: "drop.fill"
         case .erase: "eraser"
         }
     }
@@ -1300,12 +1304,25 @@ final class EditorModel: ObservableObject {
 
     // MARK: Build & play
 
+    /// Scene ▸ right-click ▸ Play From Here: run the open scene with the player starting at `point`
+    func playFromHere(_ point: CGPoint) {
+        guard let sc = scene, let id = openScene else { return }
+        guard sc.entities.contains(where: { def($0).tag == "Player" }) else {
+            errorMessage = "Play From Here moves the entity tagged Player, and this scene has none. Give your player the Player tag in the Inspector."
+            return
+        }
+        play(boot: .sceneAt(id, x: Int(point.x), y: Int(point.y)))
+    }
+
     func play(fromStart: Bool = false) {
+        play(boot: fromStart ? .start : (openScene.map { .scene($0) } ?? .start))
+    }
+
+    private func play(boot: Codegen.Boot) {
         guard let project, !building else { return }
         saveNow()
         building = true
         buildStatus = "Building…"
-        let boot: Codegen.Boot = fromStart ? .start : (openScene.map { .scene($0) } ?? .start)
         Task.detached {
             let result = Builder.build(project, boot: boot) { msg in
                 Task { @MainActor in self.buildStatus = msg }

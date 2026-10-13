@@ -53,7 +53,7 @@ At boot `main()` sets `REG_WAITCNT` to the fast cartridge timing (3/1 wait state
 7. `entities_render()` fills the OAM shadow and `draw_render()` rasterizes this frame's lines; both are uploaded at the next vblank
 8. `sound_update()` mixes the next 224 samples (the timer 1 interrupt starts playing them), then the frame budget overlay is drawn if it's on
 
-At boot, before the loop: `sound_init()`, `save_init()`, then the title menu (`menu_boot()`) if it's enabled, otherwise the boot scene.
+At boot, before the loop: `sound_init()`, `save_init()`, then the title menu (`menu_boot()`) if it's enabled, otherwise the boot scene. For the editor's *Play From Here*, the generated `boot_player` (`{ placed, x, y }`) then moves the Player-tagged entity there with `player_place()`, which loading a save uses too.
 
 Input is read right after vblank and its result is on screen at the next vblank: one frame of latency, the minimum for this design.
 

@@ -11,6 +11,7 @@ public enum Codegen {
 
     public enum Boot: Equatable, Sendable {
         case start, scene(UUID)
+        case sceneAt(UUID, x: Int, y: Int)   // Play From Here: the player starts at x, y
     }
 
     public struct GenError: LocalizedError {
@@ -394,9 +395,11 @@ public enum Codegen {
         let bootIndex: Int
         switch boot {
         case .start: bootIndex = p.sceneIndex(s.startScene) ?? 0
-        case .scene(let id): bootIndex = p.sceneIndex(id) ?? 0
+        case .scene(let id), .sceneAt(let id, _, _): bootIndex = p.sceneIndex(id) ?? 0
         }
         c.line("const int boot_scene = \(bootIndex);")
+        if case .sceneAt(_, let x, let y) = boot { c.line("const int boot_player[3] = { 1, \(x), \(y) };") }
+        else { c.line("const int boot_player[3] = { 0, 0, 0 };") }
         // Menus
         let menu = s.menu
         let startIndex = p.sceneIndex(s.startScene) ?? 0

@@ -178,6 +178,7 @@ int main(void) {
     sound_init();
     save_init();
     if (boot_title) menu_boot(); else scene_start(boot_scene);
+    if (!boot_title && boot_player[0]) player_place(boot_player[1], boot_player[2]);
     entities_render(cam_x, cam_y);
 
     while (1) {

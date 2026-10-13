@@ -106,6 +106,7 @@ void camera_update(void) {
 }
 
 void camera_follow(Entity *e) { target = e; }
+Entity *camera_target(void) { return target; }
 void camera_shake(int frames, int strength) { shake_frames = frames; shake_strength = strength; }
 int camera_x(void) { return cam_x; }
 int camera_y(void) { return cam_y; }

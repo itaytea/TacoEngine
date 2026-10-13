@@ -62,6 +62,62 @@ test("overrides keyed by script name") {
     expect(prefab.merged(with: legacy) == .object(["scripts": .array([script("Walk", 1), script("Jump", 9)])]), "index keys")
 }
 
+// MARK: Editing several entities
+
+test("multi-entity edits") {
+    var a = EntityDef(), b = EntityDef()
+    a.tag = "Enemy"; b.tag = "Enemy"
+    a.collider = ColliderComponent(x: -4, w: 8); b.collider = ColliderComponent(x: -6, w: 12)
+    a.sprite = SpriteComponent(animation: "walk")
+    a.scripts = [ScriptComponent(script: "Walk", fields: ["speed": .number(1), "range": .number(10)]), ScriptComponent(script: "Hurt")]
+    b.scripts = [ScriptComponent(script: "Walk", fields: ["speed": .number(2), "range": .number(10)])]
+    let shared = EntityDef.shared([a, b])
+    expect(shared.sprite == nil && shared.collider != nil, "only components both have")
+    expect(shared.scripts.map(\.script) == ["Walk"], "only scripts both have")
+    let mixed = EntityDef.mixed([a, b])
+    expect(mixed?.contains(path: ["collider", "x"]) == true && mixed?.contains(path: ["collider", "w"]) == true, "differing collider values")
+    expect(mixed?.contains(path: ["collider", "h"]) == false && mixed?.contains(path: ["tag"]) == false, "equal values aren't mixed")
+    expect(mixed?.contains(path: ["scripts", "@Walk", "fields", "speed"]) == true, "differing script field")
+    // Changing one value copies only that value
+    var edit = shared
+    edit.collider?.h = 20
+    edit.scripts[0].fields["range"] = .number(50)
+    let b2 = b.applyingEdit(from: shared, to: edit)
+    expect(b2.collider == ColliderComponent(x: -6, w: 12, h: 20), "h set, x and w kept")
+    expect(b2.scripts[0].fields == ["speed": .number(2), "range": .number(50)], "range set, speed kept")
+    let a2 = a.applyingEdit(from: shared, to: edit)
+    expect(a2.sprite == a.sprite && a2.scripts.count == 2, "components not shown are untouched")
+    // Adding and removing components
+    var add = shared
+    add.platformer = PlatformerComponent()
+    add.scripts.append(ScriptComponent(script: "Hurt"))
+    expect(b.applyingEdit(from: shared, to: add).platformer != nil, "added component")
+    expect(a.applyingEdit(from: shared, to: add).scripts.filter { $0.script == "Hurt" }.count == 1, "a script it has isn't added twice")
+    var remove = shared
+    remove.collider = nil
+    remove.scripts = []
+    let b3 = b.applyingEdit(from: shared, to: remove)
+    expect(b3.collider == nil && b3.scripts.isEmpty, "removed components")
+}
+
+// MARK: Tile tools
+
+test("rectangle and flood fill") {
+    var s = SceneAsset(width: 6, height: 4)
+    s.fillRect(4, 2, 1, 1, with: 3)
+    expect((1...4).allSatisfy { x in s[x, 1] == 3 && s[x, 2] == 3 } && s[0, 1] == 0 && s[1, 3] == 0, "corners in any order")
+    s.fillRect(-5, -5, 10, 0, with: 2)
+    expect((0..<6).allSatisfy { s[$0, 0] == 2 }, "clipped to the map")
+    s.fillRect(10, 10, 20, 20, with: 9)
+    expect(!s.cells.contains(9), "a box outside the map does nothing")
+    s.floodFill(0, 3, with: 7)
+    expect(s[0, 3] == 7 && s[5, 3] == 7 && s[0, 1] == 7 && s[5, 2] == 7, "fills the empty area around the box")
+    expect(s[2, 1] == 3 && s[0, 0] == 2, "stops at other tiles")
+    let before = s
+    s.floodFill(2, 2, with: 3)
+    expect(s == before, "filling with the same tile changes nothing")
+}
+
 // MARK: Dialogue
 
 test("page character counts") {
@@ -155,6 +211,9 @@ test("generated code for a new project") {
         expect(assets == expected, "assets.c matches Fixtures/new_project_assets.c (run with --update-golden after an intended change)")
     }
     expect(try Codegen.generate(p).assets == assets, "generation is deterministic")
+    expect(assets.contains("const int boot_player[3] = { 0, 0, 0 };"), "no player position by default")
+    let here = try Codegen.generate(p, boot: .sceneAt(p.settings.scenes[0], x: 40, y: -3)).assets
+    expect(here.contains("const int boot_player[3] = { 1, 40, -3 };") && here.contains("const int boot_title = 0;"), "Play From Here")
 }
 
 print(failures == 0 ? "All \(checks) checks passed." : "\(failures) of \(checks) checks failed.")

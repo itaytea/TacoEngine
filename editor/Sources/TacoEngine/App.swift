@@ -106,7 +106,7 @@ struct MainView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .help("Move: select and drag entities · Paint: draw tiles · Erase: remove tiles")
+            .help("Move: select and drag entities · Paint: draw tiles · Rectangle: drag to fill a box · Fill: flood an area · Erase: remove tiles")
         }
         ToolbarItemGroup(placement: .principal) {
             Button { model.play() } label: {
