@@ -194,8 +194,10 @@ struct SpriteEditor: View {
         panel.allowedContentTypes = [.png]
         guard panel.runModal() == .OK, let src = panel.url else { return }
         let dest = p.imageURL(assetPath: stored.path, image: stored.value.image)
-        try? FileManager.default.removeItem(at: dest)
-        try? FileManager.default.copyItem(at: src, to: dest)
+        do { try safeCopyReplacing(src, to: dest) } catch {
+            model.errorMessage = "Couldn't replace the image: \(error.localizedDescription)"
+            return
+        }
         model.refreshFromDisk()
     }
 }

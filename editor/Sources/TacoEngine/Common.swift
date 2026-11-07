@@ -220,3 +220,23 @@ struct SoundPicker: View {
         }
     }
 }
+
+/// Copies `src` over `dest` without ever destroying the only copy: does nothing when both are the
+/// same file, and copies to a temp file next to `dest` first so a failed copy leaves `dest` intact.
+func safeCopyReplacing(_ src: URL, to dest: URL) throws {
+    if src.standardizedFileURL.resolvingSymlinksInPath() == dest.standardizedFileURL.resolvingSymlinksInPath() { return }
+    let fm = FileManager.default
+    try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let tmp = dest.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString).tmp")
+    try fm.copyItem(at: src, to: tmp)
+    do {
+        if fm.fileExists(atPath: dest.path) {
+            _ = try fm.replaceItemAt(dest, withItemAt: tmp)
+        } else {
+            try fm.moveItem(at: tmp, to: dest)
+        }
+    } catch {
+        try? fm.removeItem(at: tmp)
+        throw error
+    }
+}

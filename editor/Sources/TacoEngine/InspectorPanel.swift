@@ -913,8 +913,10 @@ struct TextBoxInspector: View {
         guard panel.runModal() == .OK, let src = panel.url else { return }
         let name = stored.value.frameImage ?? (assetName(URL(fileURLWithPath: stored.path)) + " frame.png")
         let dest = p.imageURL(assetPath: stored.path, image: name)
-        try? FileManager.default.removeItem(at: dest)
-        try? FileManager.default.copyItem(at: src, to: dest)
+        do { try safeCopyReplacing(src, to: dest) } catch {
+            model.errorMessage = "Couldn't replace the frame image: \(error.localizedDescription)"
+            return
+        }
         model.checkpoint()
         model.project?.textboxes[id]?.value.frameImage = name
         model.refreshFromDisk()
