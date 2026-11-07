@@ -748,6 +748,7 @@ final class EditorModel: ObservableObject {
         panel.message = asTileset ? "Choose a tileset image (a grid of 16x16 tiles)" : "Choose sprite sheet images (a grid of equal-size frames)"
         guard panel.runModal() == .OK else { return }
         var created: UUID?
+        var copyError: String?
         edit { p in
             for src in panel.urls {
                 let base = src.deletingPathExtension().lastPathComponent
@@ -755,9 +756,9 @@ final class EditorModel: ObservableObject {
                 let jsonPath = project.uniquePath(dir, base, asTileset ? ".tileset.json" : ".sprite.json")
                 let imageName = assetName(URL(fileURLWithPath: jsonPath)) + ".png"
                 let dest = p.url(dir).appendingPathComponent(imageName)
-                try? FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try? FileManager.default.removeItem(at: dest)
-                try? FileManager.default.copyItem(at: src, to: dest)
+                do { try safeCopyReplacing(src, to: dest) } catch {
+                    copyError = "Couldn't import \(src.lastPathComponent): \(error.localizedDescription)"
+                }
                 if asTileset {
                     let t = TilesetAsset(guid: UUID(), image: imageName, tiles: [:])
                     p.tilesets[t.guid] = Stored(path: jsonPath, value: t)
@@ -772,6 +773,7 @@ final class EditorModel: ObservableObject {
                 }
             }
         }
+        if let copyError { errorMessage = copyError }
         if let created { selection = .asset(created); center = .asset(created) }
     }
 
