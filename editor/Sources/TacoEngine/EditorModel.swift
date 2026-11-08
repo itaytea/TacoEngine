@@ -854,6 +854,30 @@ final class EditorModel: ObservableObject {
         func renamed(_ path: String, _ kind: AssetKind) -> String {
             (path as NSString).deletingLastPathComponent + "/" + clean + kind.fileSuffix
         }
+        guard let current = project.path(of: id) else { return }
+        let kinds: [(AssetKind, Bool)] = [(.sprite, project.sprites[id] != nil), (.tileset, project.tilesets[id] != nil),
+                                          (.prefab, project.prefabs[id] != nil), (.scene, project.scenes[id] != nil),
+                                          (.platformer, project.platformers[id] != nil), (.dialogue, project.dialogues[id] != nil),
+                                          (.speaker, project.speakers[id] != nil), (.textbox, project.textboxes[id] != nil),
+                                          (.font, project.fonts[id] != nil)]
+        guard let kind = kinds.first(where: { $0.1 })?.0 else { return }
+        let target = renamed(current, kind)
+        if target == current { return }
+        // Filesystems on macOS are case-insensitive, so compare lowercased paths of every other asset.
+        var others: [(UUID, String)] = []
+        others += project.sprites.map { ($0.key, $0.value.path) }
+        others += project.tilesets.map { ($0.key, $0.value.path) }
+        others += project.prefabs.map { ($0.key, $0.value.path) }
+        others += project.scenes.map { ($0.key, $0.value.path) }
+        others += project.platformers.map { ($0.key, $0.value.path) }
+        others += project.dialogues.map { ($0.key, $0.value.path) }
+        others += project.speakers.map { ($0.key, $0.value.path) }
+        others += project.textboxes.map { ($0.key, $0.value.path) }
+        others += project.fonts.map { ($0.key, $0.value.path) }
+        if others.contains(where: { $0.0 != id && $0.1.lowercased() == target.lowercased() }) {
+            errorMessage = "Couldn't rename: another asset is already named \"\(clean)\"."
+            return
+        }
         edit { p in
             if let s = p.sprites[id] { p.sprites[id]!.path = renamed(s.path, .sprite) }
             if let s = p.tilesets[id] { p.tilesets[id]!.path = renamed(s.path, .tileset) }
