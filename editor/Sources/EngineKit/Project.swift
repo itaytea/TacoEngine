@@ -161,22 +161,25 @@ public struct GameProject: Equatable, Sendable {
     /// Write every asset that differs from `old` (or everything when old is nil). Deletes removed assets.
     public func saveChanges(since old: GameProject?) throws {
         if old?.settings != settings { try saveSettings() }
-        func sync<T: Codable & Equatable & Sendable>(_ mine: [UUID: Stored<T>], _ theirs: [UUID: Stored<T>]?) throws {
+        // Removals run before any save so a path vacated by a rename can't delete a file written for another asset.
+        var saves: [() throws -> Void] = []
+        func sync<T: Codable & Equatable & Sendable>(_ mine: [UUID: Stored<T>], _ theirs: [UUID: Stored<T>]?) {
             for (id, s) in mine where theirs?[id] != s {
                 if let prev = theirs?[id], prev.path != s.path { try? FileManager.default.removeItem(at: url(prev.path)) }
-                try save(s.value, path: s.path)
+                saves.append { try self.save(s.value, path: s.path) }
             }
             for (id, s) in theirs ?? [:] where mine[id] == nil { try? FileManager.default.removeItem(at: url(s.path)) }
         }
-        try sync(sprites, old?.sprites)
-        try sync(tilesets, old?.tilesets)
-        try sync(prefabs, old?.prefabs)
-        try sync(scenes, old?.scenes)
-        try sync(platformers, old?.platformers)
-        try sync(dialogues, old?.dialogues)
-        try sync(speakers, old?.speakers)
-        try sync(textboxes, old?.textboxes)
-        try sync(fonts, old?.fonts)
+        sync(sprites, old?.sprites)
+        sync(tilesets, old?.tilesets)
+        sync(prefabs, old?.prefabs)
+        sync(scenes, old?.scenes)
+        sync(platformers, old?.platformers)
+        sync(dialogues, old?.dialogues)
+        sync(speakers, old?.speakers)
+        sync(textboxes, old?.textboxes)
+        sync(fonts, old?.fonts)
+        for save in saves { try save() }
     }
 
     // MARK: Lookups
