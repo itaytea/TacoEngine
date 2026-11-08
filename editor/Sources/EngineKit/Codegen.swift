@@ -197,7 +197,7 @@ public enum Codegen {
         // Platformer settings
         for (id, stored) in p.platformers.sorted(by: { $0.value.name < $1.value.name }) {
             let v = stored.value
-            func fx(_ d: Double) -> Int { Int((d * 256).rounded()) }
+            func fx(_ d: Double) -> Int { clampedInt(d * 256) }
             func fr(_ i: Int) -> Int { max(0, min(255, i)) }
             c.line("static const PlatformerSettings \(platSym[id]!) = {")
             c.line("    \(fx(v.runSpeed)), \(fx(v.groundAccel)), \(fx(v.groundDecel)), \(fx(v.groundTurn)), \(fx(v.airAccel)), \(fx(v.airDecel)), \(fx(v.airTurn)),")
@@ -246,8 +246,8 @@ public enum Codegen {
                         continue
                     }
                     switch f.kind {
-                    case .int: parts.append(".\(f.name) = \(Int(v.number ?? 0))")
-                    case .fixed: parts.append(".\(f.name) = \(Int(((v.number ?? 0) * 256).rounded()))")
+                    case .int: parts.append(".\(f.name) = \(clampedInt((v.number ?? 0).rounded(.towardZero)))")
+                    case .fixed: parts.append(".\(f.name) = \(clampedInt((v.number ?? 0) * 256))")
                     case .bool: parts.append(".\(f.name) = \((v.bool ?? false) ? 1 : 0)")
                     case .entity:
                         if let g = v.string.flatMap(UUID.init(uuidString:)), let eid = sceneIDs[g] { parts.append(".\(f.name) = \(eid)") }
@@ -281,7 +281,7 @@ public enum Codegen {
             }
             var col = "0, 0, 0, 0, 0"
             if let cl = def.collider {
-                col = "\(cl.x), \(cl.y), \(max(1, min(255, cl.w))), \(max(1, min(255, cl.h))), \(1 | (cl.trigger ? 2 : 0) | (cl.platform ? 4 : 0))"
+                col = "\(max(-128, min(127, cl.x))), \(max(-128, min(127, cl.y))), \(max(1, min(255, cl.w))), \(max(1, min(255, cl.h))), \(1 | (cl.trigger ? 2 : 0) | (cl.platform ? 4 : 0))"
             }
             var plat = "0, 0"
             if let pl = def.platformer {
@@ -554,6 +554,12 @@ public enum Codegen {
         let ascii = s.unicodeScalars.map { $0.isASCII && $0.value >= 32 ? String($0) : "?" }.joined()
         return "\"" + ascii.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
     }
+}
+
+/// Rounds a Double to Int without trapping: non-finite values become 0, huge values clamp to ±2^30.
+func clampedInt(_ d: Double, limit: Int = 1 << 30) -> Int {
+    guard d.isFinite else { return 0 }
+    return Int(max(-Double(limit), min(Double(limit), d.rounded())))
 }
 
 struct CWriter {
