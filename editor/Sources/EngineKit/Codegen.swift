@@ -281,7 +281,7 @@ public enum Codegen {
             }
             var col = "0, 0, 0, 0, 0"
             if let cl = def.collider {
-                col = "\(cl.x), \(cl.y), \(max(1, min(255, cl.w))), \(max(1, min(255, cl.h))), \(1 | (cl.trigger ? 2 : 0) | (cl.platform ? 4 : 0))"
+                col = "\(max(-128, min(127, cl.x))), \(max(-128, min(127, cl.y))), \(max(1, min(255, cl.w))), \(max(1, min(255, cl.h))), \(1 | (cl.trigger ? 2 : 0) | (cl.platform ? 4 : 0))"
             }
             var plat = "0, 0"
             if let pl = def.platformer {
