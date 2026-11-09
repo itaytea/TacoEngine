@@ -53,10 +53,11 @@ int pal_acquire(const SpriteAsset *s) {
             for (int c = 0; c < 16; c++) PAL_OBJ[i * 16 + c] = s->palette[c];
             return i;
         }
-    return 0;
+    return -1;   // all 16 banks are taken; no ref was acquired
 }
 
 void pal_release(int bank) {
+    if (bank < 0 || bank >= 16) return;
     if (pal_refs[bank]) pal_refs[bank]--;
 }
 
