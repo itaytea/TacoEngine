@@ -122,7 +122,7 @@ void entities_reset(void) {
 static void set_sprite(Entity *e, const SpriteAsset *s) {
     e->sprite = s;
     e->frameSlot = e->shownFrame = -1;   // sprite memory is taken when it's first drawn on screen
-    if (s) e->palBank = (u8)pal_acquire(s);
+    if (s) { int b = pal_acquire(s); e->palBank = b < 0 ? PAL_NONE : (u8)b; }
 }
 
 Entity *entity_spawn_template(const EntityTemplate *t, int x, int y, u16 id) {
@@ -199,7 +199,7 @@ void entities_flush_destroyed(void) {
         for (int s = 0; s < e->scriptCount; s++)
             if (e->scripts[s].type->on_destroy) e->scripts[s].type->on_destroy(e->scripts[s].data, e);
         frame_release(e->frameSlot);
-        if (e->sprite) pal_release(e->palBank);
+        if (e->sprite && e->palBank != PAL_NONE) pal_release(e->palBank);
         if (e->body) body_free(e->body);
         e->alive = 0;
         contacts_forget(i);
@@ -413,7 +413,7 @@ void entities_render(int camX, int camY) {
             if (e->frameSlot < 0) continue;     // sprite memory is full: skip it this frame
         }
         int prio = e->priority < 1 ? 1 : e->priority > 3 ? 3 : e->priority;
-        u16 flip = e->flipX ? ATTR1_HFLIP : 0, attr2 = (u16)((prio << 10) | (e->palBank << 12));
+        u16 flip = e->flipX ? ATTR1_HFLIP : 0, attr2 = (u16)((prio << 10) | ((e->palBank == PAL_NONE ? 0 : e->palBank) << 12));
         if (!s->pieceCount) {
             oam_shadow[n * 4 + 0] = (u16)((sy & 0xFF) | (s->objShape << 14));
             oam_shadow[n * 4 + 1] = (u16)((sx & 0x1FF) | (s->objSize << 14) | flip);

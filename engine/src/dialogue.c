@@ -129,7 +129,7 @@ static void show_box(bool on) {
 
 static void portrait_release(void) {
     if (portrait_tile >= 0) vram_free(portrait_tile, portrait_tiles);
-    if (portrait) pal_release(portrait_pal);
+    if (portrait && portrait_pal >= 0) pal_release(portrait_pal);
     portrait = NULL;
     portrait_tile = -1;
 }
@@ -166,7 +166,7 @@ void dialogue_render_portrait(u16 *oam) {
     if (f != portrait_shown) { portrait_shown = f; portrait_dirty = 1; }
     oam[0] = (u16)((py & 0xFF) | (portrait->objShape << 14));
     oam[1] = (u16)((px & 0x1FF) | (portrait->objSize << 14));
-    oam[2] = (u16)(portrait_tile | (0 << 10) | (portrait_pal << 12));
+    oam[2] = (u16)(portrait_tile | (0 << 10) | ((portrait_pal < 0 ? 0 : portrait_pal) << 12));
 }
 
 // ---- Pages ----
