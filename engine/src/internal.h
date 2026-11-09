@@ -46,6 +46,7 @@ void entities_flush_destroyed(void);
 // sprite memory (entity.c)
 int vram_alloc(int tiles);
 void vram_free(int start, int tiles);
+#define PAL_NONE 0xFF   // palBank value meaning no bank was acquired (draw with bank 0)
 int pal_acquire(const SpriteAsset *s);
 void pal_release(int bank);
 
