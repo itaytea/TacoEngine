@@ -38,7 +38,7 @@ void scene_start(int index) {
     tilemap_load(s);
     background_reset();
     Entity *camTarget = NULL;
-    Entity *spawned[MAX_ENTITIES];
+    Entity *spawned[MAX_ENTITIES] = { 0 };
     for (int i = 0; i < s->entityCount; i++) {
         const SceneEntity *se = &s->entities[i];
         Entity *e = entity_spawn_template(se->tmpl, se->x, se->y, se->id);
@@ -47,7 +47,7 @@ void scene_start(int index) {
     }
     for (int i = 0; i < s->entityCount && i < MAX_ENTITIES; i++) {   // children follow their parents
         int pi = s->entities[i].parent - 1;
-        if (pi >= 0 && pi < MAX_ENTITIES && spawned[i] && spawned[pi]) set_parent(spawned[i], spawned[pi]);
+        if (pi >= 0 && pi < s->entityCount && pi < MAX_ENTITIES && spawned[i] && spawned[pi]) set_parent(spawned[i], spawned[pi]);
     }
     camera_reset(s, camTarget);
     play_music(s->music);
