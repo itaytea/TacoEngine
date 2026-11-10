@@ -31,6 +31,10 @@ typedef struct {
     u16 hasPlayer, pad;
 } SaveHeader;
 
+// vars[] in main.c holds 64 ints; a full set of them plus the header must fit in one slot.
+#define MAX_VARS 64
+_Static_assert(sizeof(SaveHeader) + MAX_VARS * 4 <= SLOT_SIZE, "a full save must fit in one slot");
+
 static int pending_slot = -1;   // load_game waits for the end of the frame
 
 void save_init(void) {
