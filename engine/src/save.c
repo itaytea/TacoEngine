@@ -42,11 +42,11 @@ static Entity *player(void) { return player_tag ? find_with_tag(player_tag) : NU
 
 bool save_game(int slot) {
     if (slot < 0 || slot >= SLOTS) return false;
-    SaveHeader h = { MAGIC, (u16)current_scene(), (u16)var_count, 0, 0, 0, 0 };
+    int n = var_count;
+    if ((int)sizeof(SaveHeader) + n * 4 > SLOT_SIZE) n = (SLOT_SIZE - (int)sizeof(SaveHeader)) / 4;
+    SaveHeader h = { MAGIC, (u16)current_scene(), (u16)n, 0, 0, 0, 0 };
     Entity *p = player();
     if (p) { h.hasPlayer = 1; h.playerX = (s16)ex(p); h.playerY = (s16)ey(p); }
-    int n = var_count;
-    if ((int)sizeof h + n * 4 > SLOT_SIZE) n = (SLOT_SIZE - (int)sizeof h) / 4;
     sram_write(slot * SLOT_SIZE + (int)sizeof h, vars, n * 4);
     sram_write(slot * SLOT_SIZE, &h, sizeof h);
     return true;
