@@ -40,13 +40,18 @@ IWRAM_CODE static void mix(s8 *out) {
         Channel *ch = chans[c];
         if (!ch->active) continue;
         int vol = c == 0 ? music_vol : sfx_vol;
+        const s8 *data = ch->data;
+        u32 pos = ch->pos, length = ch->length;
+        u8 loop = ch->loop, active = 1;
         for (int i = 0; i < BUF; i++) {
-            acc[i] += ch->data[ch->pos] * vol;
-            if (++ch->pos >= ch->length) {
-                if (ch->loop) ch->pos = 0;
-                else { ch->active = 0; break; }
+            acc[i] += data[pos] * vol;
+            if (++pos >= length) {
+                if (loop) pos = 0;
+                else { active = 0; break; }
             }
         }
+        ch->pos = pos;
+        ch->active = active;
     }
     for (int i = 0; i < BUF; i++) {
         int v = acc[i] >> 4;
