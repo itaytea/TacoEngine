@@ -67,7 +67,19 @@ public enum Templates {
         return (try? FileManager.default.copyItem(at: src, to: dest)) != nil
     }
 
-    public static func emptyProject(at root: URL, scriptTemplates: URL? = nil) throws -> GameProject {
+    public enum TemplateError: LocalizedError {
+        case projectExists(URL)
+        public var errorDescription: String? {
+            switch self {
+            case .projectExists(let url):
+                return "A project already exists at \(url.path) (project.json is present). Choose a different folder."
+            }
+        }
+    }
+
+    /// Throws `TemplateError.projectExists` if `root` already holds a project, unless `overwrite` is true.
+    public static func emptyProject(at root: URL, scriptTemplates: URL? = nil, overwrite: Bool = false) throws -> GameProject {
+        if !overwrite && GameProject.isProject(root) { throw TemplateError.projectExists(root) }
         try FileManager.default.createDirectory(at: root.appendingPathComponent("scripts"), withIntermediateDirectories: true)
         var p = GameProject(root: root, settings: ProjectSettings(name: root.lastPathComponent.uppercased()))
         try addSquareSprite(to: &p, folder: "assets/sprites")
