@@ -2,14 +2,14 @@ import EngineKit
 import Foundation
 
 // Command-line companion to Taco Engine:
-//   gbaexport new <folder>                        create a new project
+//   gbaexport new <folder> [--force]              create a new project (--force overwrites an existing one)
 //   gbaexport build <project> [--scene Name] [--run]
 //   gbaexport check <project>                     parse scripts and generate code without compiling
 //   gbaexport export-web <project> <folder>       build and write a web version (index.html + game.gba)
 
 let args = Array(CommandLine.arguments.dropFirst())
 guard args.count >= 2 else {
-    print("usage: gbaexport new|build|check|export-web <projectFolder> [--scene Name] [--run]")
+    print("usage: gbaexport new|build|check|export-web <projectFolder> [--scene Name] [--run] [--force]")
     exit(1)
 }
 let root = URL(fileURLWithPath: args[1]).standardizedFileURL
@@ -17,7 +17,12 @@ let root = URL(fileURLWithPath: args[1]).standardizedFileURL
 do {
     switch args[0] {
     case "new":
-        let p = try Templates.emptyProject(at: root, scriptTemplates: Templates.scriptLibrary(engine: Builder.findEngine(for: root)))
+        let force = args.contains("--force")
+        if GameProject.isProject(root) && !force {
+            print("error: a project already exists at \(root.path); pass --force to overwrite it")
+            exit(1)
+        }
+        let p = try Templates.emptyProject(at: root, scriptTemplates: Templates.scriptLibrary(engine: Builder.findEngine(for: root)), overwrite: force)
         print("Created empty project: \(p.sprites.count) sprite, \(p.tilesets.count) tileset, \(p.scenes.count) scene")
     case "export-web":
         guard args.count >= 3 else { print("usage: gbaexport export-web <project> <folder>"); exit(1) }
