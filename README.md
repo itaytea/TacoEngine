@@ -48,6 +48,8 @@ Start with [Getting started](docs/getting-started.md). The full list is in [docs
 - [Building](docs/building.md): the command line, web export and running on hardware
 - [How Taco Engine works](docs/architecture.md): internals, for contributors
 
+Contributing? See [CONTRIBUTING.md](CONTRIBUTING.md). Something not building? See [Troubleshooting](docs/TROUBLESHOOTING.md).
+
 ## Limitations
 
 - The editor runs on macOS only. Games run anywhere a GBA ROM runs.
