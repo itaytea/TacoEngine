@@ -402,6 +402,7 @@ void draw_line(int x0, int y0, int x1, int y1, u16 color, int width);
 
 // Utilities
 int rand_int(int lo, int hi);                  // inclusive
+void set_seed(u32 seed);                       // fixed seed = repeatable sequence; 0 is treated as a default
 int frame_count(void);
 fixed fx_sin(int angle);                       // angle 0..255 = full turn
 fixed fx_cos(int angle);
