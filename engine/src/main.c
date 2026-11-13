@@ -81,6 +81,12 @@ void set_background(u16 color) { PAL_BG[0] = color; }
 // ---- Utilities ----
 
 static u32 rng = 0x2F6E2B1u;
+static bool rng_seeded;
+
+void set_seed(u32 seed) {
+    rng = seed ? seed : 0x2F6E2B1u;   // xorshift must never hold 0
+    rng_seeded = true;
+}
 
 int rand_int(int lo, int hi) {
     rng ^= rng << 13;
@@ -153,6 +159,8 @@ int main(void) {
 
         read_input();
         frame_counter++;
+        if (!rng_seeded && input_pressed)   // first key press: frame timing is effectively random
+            set_seed((u32)frame_counter * 2654435761u ^ ((u32)REG_VCOUNT << 16) ^ REG_VCOUNT);
         if (key_held(KEY_L) && key_held(KEY_R) && key_pressed(KEY_SELECT)) {
             debug_overlay ^= 1;
             text_clear_row(19);

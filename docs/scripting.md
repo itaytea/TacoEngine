@@ -214,7 +214,7 @@ While a menu is open it takes the buttons, so scripts see no input.
 
 ### Utilities
 
-`rand_int(lo, hi)` (inclusive), `frame_count()`, `fx_sin(angle)` / `fx_cos(angle)` (angle 0–255 = full turn, result in fixed), `clamp`, `iabs`, `sign`.
+`rand_int(lo, hi)` (inclusive), `set_seed(seed)` (the generator seeds itself from timing on the first key press; call this for a repeatable sequence), `frame_count()`, `fx_sin(angle)` / `fx_cos(angle)` (angle 0–255 = full turn, result in fixed), `clamp`, `iabs`, `sign`.
 
 ### Engine messages (OnMessage)
 
