@@ -43,6 +43,8 @@ public enum Builder {
 
     /// Write generated files (only touching them if their content changed, to keep builds incremental).
     public static func export(_ p: GameProject, boot: Codegen.Boot) throws -> [String] {
+        var p = p
+        p.reloadScripts()   // the cached script list can be stale (undo, edits outside the editor)
         let sounds = try SoundConverter.convertAll(p)
         let out = try Codegen.generate(p, boot: boot, sounds: sounds)
         let gen = p.buildDir.appendingPathComponent("generated")

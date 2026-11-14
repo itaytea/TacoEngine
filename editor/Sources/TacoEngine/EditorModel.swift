@@ -425,6 +425,7 @@ final class EditorModel: ObservableObject {
         guard let current = project else { return }
         undoManager?.registerUndo(withTarget: self) { model in model.restore(current) }
         project = snapshot
+        project!.reloadScripts()   // the snapshot's cached script list may be out of date
     }
 
     func edit(_ change: (inout GameProject) -> Void) {
