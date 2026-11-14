@@ -243,18 +243,27 @@ public enum DialogueText {
         return out
     }
 
+    /// Most glyphs the engine keeps for one page. engine/src/dialogue.c stops laying a page out at
+    /// MAX_CHARS (160); stay a bit under it because the engine also counts spaces and variable digits.
+    public static let maxGlyphsPerPage = 150
+
     /// Wrap text into pages of positioned characters
     public static func pages(_ text: String, font: FontData, width: Int, lines: Int, variables: [String]) -> [[DialogueChar]] {
         let toks = tokens(text, variables: variables)
         var pages: [[DialogueChar]] = [[]]
         var x = 0, line = 0
+        var used = 0   // glyphs placed on the current page (the engine's glyph_count, roughly)
         func adv(_ c: UInt8, _ flags: Int) -> Int { font.width(c) + (flags & bold != 0 ? 1 : 0) }
         func newLine() {
             x = 0
             line += 1
-            if line >= lines { pages.append([]); line = 0 }
+            if line >= lines { pages.append([]); line = 0; used = 0 }
         }
-        func newPage() { x = 0; line = 0; if !(pages.last?.isEmpty ?? true) { pages.append([]) } }
+        func newPage() { x = 0; line = 0; if !(pages.last?.isEmpty ?? true) { pages.append([]); used = 0 } }
+        // Start a new page if `n` more glyphs would go past the engine's per-page limit
+        func ensureRoom(_ n: Int) {
+            if used > 0 && used + n > maxGlyphsPerPage { pages.append([]); x = 0; line = 0; used = 0 }
+        }
         // Group into words so wrapping happens at spaces
         var i = 0
         while i < toks.count {
@@ -262,10 +271,12 @@ public enum DialogueText {
             case .newline: newLine(); i += 1; continue
             case .page: newPage(); i += 1; continue
             case .pause(let n):
+                ensureRoom(1)
                 pages[pages.count - 1].append(DialogueChar(x: x, y: line * font.height, ch: 0, flags: 0, color: 0, pause: n))
+                used += 1
                 i += 1; continue
             case .char(32, let f, _):
-                if x > 0 { x += adv(32, f) }
+                if x > 0 { x += adv(32, f); used += 1 }
                 i += 1; continue
             default: break
             }
@@ -285,16 +296,24 @@ public enum DialogueText {
                 j += 1
             }
             if x > 0 && x + w > width { newLine() }
+            // keep a word together on one page when it fits
+            ensureRoom(word.reduce(0) { n, t in if case .variable = t { return n + 3 }; return n + 1 })
             for t in word {
                 switch t {
                 case .char(let c, let f, let col):
+                    ensureRoom(1)
                     if x + adv(c, f) > width && x > 0 { newLine() }   // a single word longer than the line
                     pages[pages.count - 1].append(DialogueChar(x: x, y: line * font.height, ch: c, flags: f, color: col))
                     x += adv(c, f)
+                    used += 1
                 case .variable(let v, let f, let col):
+                    ensureRoom(3)
                     pages[pages.count - 1].append(DialogueChar(x: x, y: line * font.height, ch: 1, flags: f, color: col, pause: v))
                     x += 3 * adv(48, f)
+                    used += 3
                 case .pause(let n):
+                    ensureRoom(1)
+                    used += 1
                     pages[pages.count - 1].append(DialogueChar(x: x, y: line * font.height, ch: 0, flags: 0, color: 0, pause: n))
                 default: break
                 }
