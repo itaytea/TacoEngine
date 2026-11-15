@@ -29,7 +29,10 @@ public enum Builder {
             let e = u.appendingPathComponent("engine")
             return FileManager.default.fileExists(atPath: e.appendingPathComponent("src/engine.h").path) ? e : nil
         }
-        if let env = ProcessInfo.processInfo.environment["GBA_ENGINE"] { return URL(fileURLWithPath: env) }
+        if let env = ProcessInfo.processInfo.environment["GBA_ENGINE"], !env.isEmpty {
+            let u = URL(fileURLWithPath: env)
+            if FileManager.default.fileExists(atPath: u.appendingPathComponent("src/engine.h").path) { return u }
+        }
         var dir = project
         for _ in 0..<5 {
             if let e = check(dir) { return e }
@@ -70,7 +73,7 @@ public enum Builder {
             diags.append(Diagnostic(severity: .error, message: msg))
             return BuildResult(success: false, log: log + msg + "\n", diagnostics: diags, rom: nil)
         }
-        guard let engine = findEngine(for: p.root) else { return fail("Couldn't find the engine runtime (engine/src/engine.h). Rebuild TacoEngine.app with build_editor.sh, or set the GBA_ENGINE environment variable to the engine folder.") }
+        guard let engine = findEngine(for: p.root) else { return fail("Couldn't find the engine runtime (engine/src/engine.h). Rebuild TacoEngine.app with build_editor.sh, or set the GBA_ENGINE environment variable to a folder containing src/engine.h.") }
         guard FileManager.default.fileExists(atPath: tool + "gcc") else { return fail("devkitARM isn't installed (looked in \(devkitPro)). Taco Engine needs it to build games: install devkitPro with the gba-dev package, see https://devkitpro.org/wiki/Getting_Started") }
 
         progress?("Exporting assets…")
