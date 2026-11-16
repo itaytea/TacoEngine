@@ -40,6 +40,8 @@ public enum WebExport {
     static func js(_ s: String) -> String {
         s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "<", with: "\\u003c")
+            .replacingOccurrences(of: "\n", with: "\\n").replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\u{2028}", with: "\\u2028").replacingOccurrences(of: "\u{2029}", with: "\\u2029")
     }
 
     /// Only the game: it fills the page (or the iframe it's embedded in), letterboxed to 3:2.
