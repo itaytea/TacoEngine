@@ -40,6 +40,8 @@ public enum WebExport {
     static func js(_ s: String) -> String {
         s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "<", with: "\\u003c")
+            .replacingOccurrences(of: "\n", with: "\\n").replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\u{2028}", with: "\\u2028").replacingOccurrences(of: "\u{2029}", with: "\\u2029")
     }
 
     /// Only the game: it fills the page (or the iframe it's embedded in), letterboxed to 3:2.
@@ -73,6 +75,7 @@ public enum WebExport {
             window.EJS_gameName = "\(js(title))";
             window.EJS_pathtodata = "\(data)";
             var script = document.createElement("script");
+            script.crossOrigin = "anonymous";  // SRI integrity hash still pending
             script.src = "\(data)loader.js";
             script.onerror = function () {
               document.body.insertAdjacentHTML("beforeend", '<div id="message">The emulator couldn\\'t be downloaded. Check your connection and reload.</div>');
