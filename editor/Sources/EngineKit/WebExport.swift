@@ -75,6 +75,7 @@ public enum WebExport {
             window.EJS_gameName = "\(js(title))";
             window.EJS_pathtodata = "\(data)";
             var script = document.createElement("script");
+            script.crossOrigin = "anonymous";  // SRI integrity hash still pending
             script.src = "\(data)loader.js";
             script.onerror = function () {
               document.body.insertAdjacentHTML("beforeend", '<div id="message">The emulator couldn\\'t be downloaded. Check your connection and reload.</div>');
