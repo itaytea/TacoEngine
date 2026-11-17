@@ -304,6 +304,12 @@ public enum Codegen {
             guard let stored = p.scenes[sid] else { continue }
             let sc = stored.value
             let sn = "scene_\(index)"
+            guard sc.width >= 0, sc.height >= 0, sc.width <= 256, sc.height <= 256 else {
+                throw GenError(message: "Scene \(stored.name): scenes can be at most 256x256 cells (are \(sc.width)x\(sc.height)).")
+            }
+            guard sc.cells.count == sc.width * sc.height else {
+                throw GenError(message: "Scene \(stored.name): has \(sc.cells.count) cells but \(sc.width)x\(sc.height) needs \(sc.width * sc.height).")
+            }
             sceneSyms.append(sn)
             var ids: [UUID: Int] = [:]
             for (i, e) in sc.entities.enumerated() { ids[e.guid] = i + 1 }
