@@ -13,10 +13,11 @@ int tilemap_w, tilemap_h;
 static int drawn_cx = -9999, drawn_cy = -9999;
 
 void tilemap_load(const Scene *s) {
-    tilemap_w = s->w;
-    tilemap_h = s->h;
-    int n = s->w * s->h;
-    if (n > MAX_CELLS) n = MAX_CELLS;
+    tilemap_w = s->w > 256 ? 256 : s->w;
+    tilemap_h = s->h > 256 ? 256 : s->h;
+    if (tilemap_w < 0) tilemap_w = 0;
+    if (tilemap_h < 0) tilemap_h = 0;
+    int n = tilemap_w * tilemap_h;
     for (int i = 0; i < n; i++) map[i] = s->map ? s->map[i] : 0;
     tileset = s->tileset;
     if (tileset) {
