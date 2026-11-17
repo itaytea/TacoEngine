@@ -57,9 +57,9 @@ struct SpriteEditor: View {
         VStack(alignment: .leading, spacing: Space.sm) {
             HStack(spacing: Space.sm) {
                 Text("Frame size").foregroundStyle(.secondary).frame(width: 64, alignment: .leading)
-                IntField(label: "", value: edit(\.frameWidth), width: 48)
+                IntField(label: "", value: edit(\.frameWidth, min: 1), width: 48)
                 Text("×").foregroundStyle(.secondary)
-                IntField(label: "", value: edit(\.frameHeight), width: 48)
+                IntField(label: "", value: edit(\.frameHeight, min: 1), width: 48)
                 Spacer()
                 Button("Replace Image…") { replaceImage() }
             }
@@ -80,8 +80,8 @@ struct SpriteEditor: View {
         .controlSize(.small)
     }
 
-    func edit(_ kp: WritableKeyPath<SpriteAsset, Int>) -> Binding<Int> {
-        Binding(get: { sprite.wrappedValue[keyPath: kp] }, set: { v in model.checkpoint(); sprite.wrappedValue[keyPath: kp] = max(0, min(256, v)) })
+    func edit(_ kp: WritableKeyPath<SpriteAsset, Int>, min lo: Int = 0) -> Binding<Int> {
+        Binding(get: { sprite.wrappedValue[keyPath: kp] }, set: { v in model.checkpoint(); sprite.wrappedValue[keyPath: kp] = max(lo, min(256, v)) })
     }
 
     func sheet(_ url: URL, _ s: SpriteAsset) -> some View {
@@ -91,7 +91,7 @@ struct SpriteEditor: View {
         return VStack(alignment: .leading, spacing: Space.xs) {
             GeometryReader { geo in
                 let scale = max(1, min(geo.size.width / CGFloat(img?.width ?? 1), geo.size.height / CGFloat(img?.height ?? 1)))
-                let fw = CGFloat(s.frameWidth) * scale, fh = CGFloat(s.frameHeight) * scale
+                let fw = CGFloat(max(1, s.frameWidth)) * scale, fh = CGFloat(max(1, s.frameHeight)) * scale
                 ZStack(alignment: .topLeading) {
                     Checkerboard()
                     PixelImage(bitmap: img)
@@ -170,7 +170,7 @@ struct SpriteEditor: View {
                 let seq = anim?.frames ?? [0]
                 let fi = seq.isEmpty ? 0 : seq[Int(t * Double(max(anim?.fps ?? 1, 1))) % seq.count]
                 GeometryReader { geo in
-                    let scale = min(geo.size.width / CGFloat(s.frameWidth), geo.size.height / CGFloat(s.frameHeight))
+                    let scale = min(geo.size.width / CGFloat(max(1, s.frameWidth)), geo.size.height / CGFloat(max(1, s.frameHeight)))
                     ZStack(alignment: .topLeading) {
                         Checkerboard()
                         if fi < frames.count { PixelImage(bitmap: frames[fi]).frame(width: CGFloat(s.frameWidth) * scale, height: CGFloat(s.frameHeight) * scale) }
