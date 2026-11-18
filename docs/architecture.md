@@ -67,6 +67,8 @@ Input is read right after vblank and its result is on screen at the next vblank:
 | BG3 | Lines from `draw_line` (`draw.c`): tiles 400–511 of CBB 2, rebuilt every frame, only enabled while something is drawn | CBB 2 / SBB 31 |
 | OBJ | Entities; OAM 127 is the dialogue portrait. Frames over 64×64 are drawn as several OBJs (`SpritePiece`s, cut by the codegen) | 1D mapping |
 
+The layout constants and `_Static_assert`s that check this table (no overlapping screenblocks, screenblocks clear of the used charblocks, `draw_line` tiles inside their charblock, palette banks below 16) live in `engine/src/internal.h`.
+
 BG palette banks: 0 backdrop (entries 1–15: `draw_line` colors), 1–10 tileset, 11 background layer, 12–13 dialogue, 14–15 HUD text. Each sprite asset gets its own OBJ palette bank (reference counted, `pal_acquire`). Sprite tiles live in shared frame slots (`frame_acquire` in `entity.c`): entities showing the same frame of the same sprite share one copy, and entities that are off screen or hidden hold none (their frame is uploaded again when they come into view). Frames of 64+ tiles are allocated from the top of sprite memory and small ones from the bottom, so animation churn doesn't fragment the space big frames need.
 
 ### Sound (`sound.c`)
