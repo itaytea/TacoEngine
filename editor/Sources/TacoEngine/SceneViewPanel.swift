@@ -194,7 +194,7 @@ struct SceneViewPanel: View {
             Toggle("Snap 8px", isOn: $model.snap)
             Spacer()
             if let h = hover {
-                Text("x \(Int(h.x))  y \(Int(h.y))   cell \(Int(h.x) / 16), \(Int(h.y) / 16)")
+                Text("x \(Int(h.x))  y \(Int(h.y))   cell \(Int((h.x / 16).rounded(.down))), \(Int((h.y / 16).rounded(.down)))")
                     .font(Typo.captionDigits).foregroundStyle(.secondary)
             }
             Menu("\(Int((camera.zoom * 100).rounded()))%") {
@@ -360,7 +360,7 @@ struct SceneViewPanel: View {
                 if selected { ctx.draw(Text("B").font(Typo.captionStrong).foregroundColor(.orange), at: CGPoint(x: bp.x + 12, y: bp.y - 10)) }
             }
             if let h = hover, model.tool != .select {
-                let r = CGRect(x: CGFloat(Int(h.x) / 16 * 16) * z, y: CGFloat(Int(h.y) / 16 * 16) * z, width: 16 * z, height: 16 * z)
+                let r = CGRect(x: CGFloat(Int((h.x / 16).rounded(.down)) * 16) * z, y: CGFloat(Int((h.y / 16).rounded(.down)) * 16) * z, width: 16 * z, height: 16 * z)
                 ctx.stroke(Path(r), with: .color(.white), lineWidth: 2)
             }
         }
@@ -478,7 +478,7 @@ struct SceneViewPanel: View {
     }
 
     func paint(_ scene: SceneAsset, at p: CGPoint) {
-        let cx = Int(p.x) / 16, cy = Int(p.y) / 16
+        let cx = Int((p.x / 16).rounded(.down)), cy = Int((p.y / 16).rounded(.down))
         guard cx >= 0, cy >= 0, cx < scene.width, cy < scene.height else { return }
         let mods = NSEvent.modifierFlags
         if mods.contains(.shift) {
