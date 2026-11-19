@@ -84,6 +84,7 @@ final class EditorModel: ObservableObject {
 
     private var watcher: FolderWatcher?
     private var syncTask: Task<Void, Never>?
+    private var pendingImagesChanged = false
 
     private func startWatching(_ root: URL) {
         let rootPath = root.standardizedFileURL.path
@@ -97,11 +98,15 @@ final class EditorModel: ObservableObject {
     }
 
     private func diskChanged(imagesChanged: Bool) {
+        pendingImagesChanged = pendingImagesChanged || imagesChanged
         syncTask?.cancel()
         syncTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 200_000_000)
             guard !Task.isCancelled else { return }
-            self?.syncFromDisk(imagesChanged: imagesChanged)
+            guard let self else { return }
+            let images = self.pendingImagesChanged
+            self.pendingImagesChanged = false
+            self.syncFromDisk(imagesChanged: images)
         }
     }
 
@@ -119,7 +124,9 @@ final class EditorModel: ObservableObject {
         var mine = lastSaved ?? project
         mine.scripts = disk.scripts
         if disk.sprites != mine.sprites || disk.tilesets != mine.tilesets || disk.prefabs != mine.prefabs
-            || disk.scenes != mine.scenes || disk.platformers != mine.platformers || disk.settings != mine.settings {
+            || disk.scenes != mine.scenes || disk.platformers != mine.platformers || disk.settings != mine.settings
+            || disk.dialogues != mine.dialogues || disk.speakers != mine.speakers
+            || disk.textboxes != mine.textboxes || disk.fonts != mine.fonts {
             reload()
         }
     }
