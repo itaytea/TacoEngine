@@ -119,7 +119,9 @@ final class EditorModel: ObservableObject {
         var mine = lastSaved ?? project
         mine.scripts = disk.scripts
         if disk.sprites != mine.sprites || disk.tilesets != mine.tilesets || disk.prefabs != mine.prefabs
-            || disk.scenes != mine.scenes || disk.platformers != mine.platformers || disk.settings != mine.settings {
+            || disk.scenes != mine.scenes || disk.platformers != mine.platformers || disk.settings != mine.settings
+            || disk.dialogues != mine.dialogues || disk.speakers != mine.speakers
+            || disk.textboxes != mine.textboxes || disk.fonts != mine.fonts {
             reload()
         }
     }
