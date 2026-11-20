@@ -94,6 +94,7 @@ struct MainView: View {
         }
         .onAppear { model.undoManager = undoManager }
         .onChange(of: undoManager) { _, um in model.undoManager = um }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in model.saveNow() }
         .navigationTitle(model.project?.settings.name ?? "Taco Engine")
         .navigationSubtitle(model.openScene.flatMap { model.project?.scenes[$0]?.name } ?? "")
     }
