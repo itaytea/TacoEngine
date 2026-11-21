@@ -12,13 +12,18 @@ static u32 vram_used[1024 / 32];
 static const SpriteAsset *pal_owner[16];
 static u8 pal_refs[16];
 
+// Every tile below vram_first_free is in use, so first-fit can start there
+static int vram_first_free;
+
 int vram_alloc(int tiles) {
     int run = 0;
-    for (int i = 0; i < 1024; i++) {
+    for (int i = vram_first_free; i < 1024; i++) {
+        if ((i & 31) == 0 && vram_used[i >> 5] == 0xFFFFFFFFu) { run = 0; i += 31; continue; }
         if (vram_used[i >> 5] & (1u << (i & 31))) { run = 0; continue; }
         if (++run == tiles) {
             int start = i - tiles + 1;
             for (int k = start; k <= i; k++) vram_used[k >> 5] |= 1u << (k & 31);
+            if (start == vram_first_free) vram_first_free = i + 1;
             return start;
         }
     }
@@ -40,6 +45,7 @@ static int vram_alloc_high(int tiles) {
 }
 
 void vram_free(int start, int tiles) {
+    if (start < vram_first_free) vram_first_free = start;
     for (int k = start; k < start + tiles; k++) vram_used[k >> 5] &= ~(1u << (k & 31));
 }
 
@@ -113,6 +119,7 @@ void entities_reset(void) {
     high = 0;
     for (int i = 0; i < MAX_FRAMES; i++) frames[i].refs = 0;
     for (int i = 0; i < 1024 / 32; i++) vram_used[i] = 0;
+    vram_first_free = 0;
     for (int i = 0; i < 16; i++) pal_refs[i] = 0;
     contact_count = 0;
     body_reset_all();
