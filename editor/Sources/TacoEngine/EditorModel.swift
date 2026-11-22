@@ -287,6 +287,9 @@ final class EditorModel: ObservableObject {
             UserDefaults.standard.set(url.path, forKey: Self.lastProjectKey)
             addRecent(url)
             startWatching(url)
+            if !p.loadIssues.isEmpty {
+                errorMessage = "Some files couldn't be loaded and were left untouched:\n" + p.loadIssues.map { "\($0.path): \($0.message)" }.joined(separator: "\n")
+            }
         } catch {
             errorMessage = "Couldn't open project: \(error.localizedDescription)"
         }

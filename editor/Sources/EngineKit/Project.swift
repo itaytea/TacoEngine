@@ -8,6 +8,13 @@ public struct Stored<T: Equatable & Sendable>: Equatable, Sendable {
     public init(path: String, value: T) { self.path = path; self.value = value }
 }
 
+/// A file that couldn't be loaded as an asset (or clashed with another one).
+public struct LoadIssue: Equatable, Sendable {
+    public var path: String
+    public var message: String
+    public init(path: String, message: String) { self.path = path; self.message = message }
+}
+
 /// The whole project in memory. A value type, so undo is just keeping old copies.
 public struct GameProject: Equatable, Sendable {
     public var root: URL
@@ -22,6 +29,8 @@ public struct GameProject: Equatable, Sendable {
     public var textboxes: [UUID: Stored<TextBoxStyleAsset>] = [:]
     public var fonts: [UUID: Stored<FontAsset>] = [:]
     public var scripts: [ScriptInfo] = []
+    /// Files that failed to decode, or duplicated a GUID, during `load` (they are left untouched on disk)
+    public var loadIssues: [LoadIssue] = []
 
     public static let settingsFile = "project.json"
     public var assetsDir: URL { root.appendingPathComponent("assets") }
@@ -43,24 +52,44 @@ public struct GameProject: Equatable, Sendable {
         let data = try Data(contentsOf: root.appendingPathComponent(settingsFile))
         var p = GameProject(root: root, settings: try JSONDecoder().decode(ProjectSettings.self, from: data))
         let dec = JSONDecoder()
-        for url in p.assetFiles() {
-            guard let kind = AssetKind.of(url), let d = try? Data(contentsOf: url) else { continue }
-            let rel = p.relative(url)
-            switch kind {
-            case .sprite: if let a = try? dec.decode(SpriteAsset.self, from: d) { p.sprites[a.guid] = Stored(path: rel, value: a) }
-            case .tileset: if let a = try? dec.decode(TilesetAsset.self, from: d) { p.tilesets[a.guid] = Stored(path: rel, value: a) }
-            case .prefab: if let a = try? dec.decode(PrefabAsset.self, from: d) { p.prefabs[a.guid] = Stored(path: rel, value: a) }
-            case .scene: if let a = try? dec.decode(SceneAsset.self, from: d) { p.scenes[a.guid] = Stored(path: rel, value: a) }
-            case .platformer: if let a = try? dec.decode(PlatformerSettings.self, from: d) { p.platformers[a.guid] = Stored(path: rel, value: a) }
-            case .dialogue: if let a = try? dec.decode(DialogueAsset.self, from: d) { p.dialogues[a.guid] = Stored(path: rel, value: a) }
-            case .speaker: if let a = try? dec.decode(SpeakerAsset.self, from: d) { p.speakers[a.guid] = Stored(path: rel, value: a) }
-            case .textbox: if let a = try? dec.decode(TextBoxStyleAsset.self, from: d) { p.textboxes[a.guid] = Stored(path: rel, value: a) }
-            case .font: if let a = try? dec.decode(FontAsset.self, from: d) { p.fonts[a.guid] = Stored(path: rel, value: a) }
+        var issues: [LoadIssue] = []
+        var undecodableScenes = Set<UUID>()  // scene files that exist but failed to decode (ids read leniently)
+        func store<T: Equatable & Sendable>(_ a: T, _ guid: UUID, _ rel: String, _ dict: inout [UUID: Stored<T>]) {
+            if let existing = dict[guid] {
+                issues.append(LoadIssue(path: rel, message: "Duplicate GUID \(guid.uuidString), already used by \(existing.path); this file was skipped"))
+            } else {
+                dict[guid] = Stored(path: rel, value: a)
             }
         }
+        for url in p.assetFiles().sorted(by: { $0.path < $1.path }) {
+            guard let kind = AssetKind.of(url) else { continue }
+            let rel = p.relative(url)
+            do {
+                let d = try Data(contentsOf: url)
+                switch kind {
+                case .sprite: let a = try dec.decode(SpriteAsset.self, from: d); store(a, a.guid, rel, &p.sprites)
+                case .tileset: let a = try dec.decode(TilesetAsset.self, from: d); store(a, a.guid, rel, &p.tilesets)
+                case .prefab: let a = try dec.decode(PrefabAsset.self, from: d); store(a, a.guid, rel, &p.prefabs)
+                case .scene: let a = try dec.decode(SceneAsset.self, from: d); store(a, a.guid, rel, &p.scenes)
+                case .platformer: let a = try dec.decode(PlatformerSettings.self, from: d); store(a, a.guid, rel, &p.platformers)
+                case .dialogue: let a = try dec.decode(DialogueAsset.self, from: d); store(a, a.guid, rel, &p.dialogues)
+                case .speaker: let a = try dec.decode(SpeakerAsset.self, from: d); store(a, a.guid, rel, &p.speakers)
+                case .textbox: let a = try dec.decode(TextBoxStyleAsset.self, from: d); store(a, a.guid, rel, &p.textboxes)
+                case .font: let a = try dec.decode(FontAsset.self, from: d); store(a, a.guid, rel, &p.fonts)
+                }
+            } catch {
+                issues.append(LoadIssue(path: rel, message: error.localizedDescription))
+                if kind == .scene, let d = try? Data(contentsOf: url),
+                   let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                   let g = obj["guid"] as? String, let id = UUID(uuidString: g) {
+                    undecodableScenes.insert(id)
+                }
+            }
+        }
+        p.loadIssues = issues
         p.reloadScripts()
-        // Keep the build order in sync with the scenes on disk
-        p.settings.scenes = p.settings.scenes.filter { p.scenes[$0] != nil }
+        // Keep the build order in sync with the scenes on disk (scenes whose file exists but didn't decode stay listed)
+        p.settings.scenes = p.settings.scenes.filter { p.scenes[$0] != nil || undecodableScenes.contains($0) }
         for id in p.scenes.keys.sorted(by: { p.scenes[$0]!.path < p.scenes[$1]!.path }) where !p.settings.scenes.contains(id) {
             p.settings.scenes.append(id)
         }

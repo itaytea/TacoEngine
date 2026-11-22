@@ -35,6 +35,7 @@ public enum Codegen {
         var warnings: [String] = []
         let s = p.settings
         guard !s.scenes.isEmpty else { throw GenError(message: "The project has no scenes. Create one in the Project panel.") }
+        guard s.scenes.allSatisfy({ p.scenes[$0] != nil }) else { throw GenError(message: "A scene file couldn't be loaded, so the build was stopped. Fix or restore it first (see the warnings shown when the project opened).") }
         guard s.tileFlags.count <= 8 else { throw GenError(message: "At most 8 tile flags are supported.") }
         guard s.variables.count <= 64 else { throw GenError(message: "At most 64 variables are supported.") }
 
