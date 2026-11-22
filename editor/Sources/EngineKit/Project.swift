@@ -53,6 +53,7 @@ public struct GameProject: Equatable, Sendable {
         var p = GameProject(root: root, settings: try JSONDecoder().decode(ProjectSettings.self, from: data))
         let dec = JSONDecoder()
         var issues: [LoadIssue] = []
+        var undecodableScenes = Set<UUID>()  // scene files that exist but failed to decode (ids read leniently)
         func store<T: Equatable & Sendable>(_ a: T, _ guid: UUID, _ rel: String, _ dict: inout [UUID: Stored<T>]) {
             if let existing = dict[guid] {
                 issues.append(LoadIssue(path: rel, message: "Duplicate GUID \(guid.uuidString), already used by \(existing.path); this file was skipped"))
@@ -78,12 +79,17 @@ public struct GameProject: Equatable, Sendable {
                 }
             } catch {
                 issues.append(LoadIssue(path: rel, message: error.localizedDescription))
+                if kind == .scene, let d = try? Data(contentsOf: url),
+                   let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                   let g = obj["guid"] as? String, let id = UUID(uuidString: g) {
+                    undecodableScenes.insert(id)
+                }
             }
         }
         p.loadIssues = issues
         p.reloadScripts()
-        // Keep the build order in sync with the scenes on disk
-        p.settings.scenes = p.settings.scenes.filter { p.scenes[$0] != nil }
+        // Keep the build order in sync with the scenes on disk (scenes whose file exists but didn't decode stay listed)
+        p.settings.scenes = p.settings.scenes.filter { p.scenes[$0] != nil || undecodableScenes.contains($0) }
         for id in p.scenes.keys.sorted(by: { p.scenes[$0]!.path < p.scenes[$1]!.path }) where !p.settings.scenes.contains(id) {
             p.settings.scenes.append(id)
         }
