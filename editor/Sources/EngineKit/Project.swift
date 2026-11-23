@@ -166,7 +166,12 @@ public struct GameProject: Equatable, Sendable {
                 if let prev = theirs?[id], prev.path != s.path { try? FileManager.default.removeItem(at: url(prev.path)) }
                 try save(s.value, path: s.path)
             }
-            for (id, s) in theirs ?? [:] where mine[id] == nil { try? FileManager.default.removeItem(at: url(s.path)) }
+            for (id, s) in theirs ?? [:] where mine[id] == nil {
+                // Move deleted assets to the Trash so a mistaken delete is recoverable; fall back to a hard delete.
+                let u = url(s.path)
+                do { try FileManager.default.trashItem(at: u, resultingItemURL: nil) }
+                catch { try? FileManager.default.removeItem(at: u) }
+            }
         }
         try sync(sprites, old?.sprites)
         try sync(tilesets, old?.tilesets)
