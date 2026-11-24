@@ -19,6 +19,7 @@ public enum Codegen {
     }
 
     static let maxScripts = 6   // MAX_SCRIPTS in engine.h
+    static let maxEntities = 96   // MAX_ENTITIES in engine/src/internal.h
 
     // GBA OBJ sizes: (w, h, shape, size)
     static let objSizes: [(Int, Int, Int, Int)] = [
@@ -305,6 +306,9 @@ public enum Codegen {
             let sc = stored.value
             let sn = "scene_\(index)"
             sceneSyms.append(sn)
+            if sc.entities.count > maxEntities {
+                throw GenError(message: "Scene \(stored.name) has \(sc.entities.count) entities; the engine runs at most \(maxEntities) at once.")
+            }
             var ids: [UUID: Int] = [:]
             for (i, e) in sc.entities.enumerated() { ids[e.guid] = i + 1 }
             c.line("// Scene \(stored.name)")
