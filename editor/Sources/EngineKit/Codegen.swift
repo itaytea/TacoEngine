@@ -20,6 +20,7 @@ public enum Codegen {
 
     static let maxScripts = 6   // MAX_SCRIPTS in engine.h
     static let maxEntities = 96   // MAX_ENTITIES in engine/src/internal.h
+    static let maxBodies = 8      // MAX_BODIES in engine/src/body.c
 
     // GBA OBJ sizes: (w, h, shape, size)
     static let objSizes: [(Int, Int, Int, Int)] = [
@@ -316,14 +317,19 @@ public enum Codegen {
             c.hexRows(sc.cells.map { UInt32($0) }, digits: 2, perLine: 32)
             c.line("};")
             var rows: [String] = []
+            var bodyCount = 0
             for (i, e) in sc.entities.enumerated() {
                 let def = p.effectiveDef(e)
+                if def.platformer?.settings != nil { bodyCount += 1 }
                 let t: String
                 if let pid = e.prefab, e.overrides == nil, let ps = prefabSym[pid] { t = ps }
                 else { t = emitTemplate(def, name: e.name, symbol: nil, isStatic: true, sceneIDs: ids) }
                 let w = sc.worldPosition(of: e)
                 let parent = e.parent.flatMap { ids[$0] } ?? 0
                 rows.append("{ &\(t), \(w.x), \(w.y), \(i + 1), \(parent) }")
+            }
+            if bodyCount > maxBodies {
+                warnings.append("Scene \(stored.name): \(bodyCount) Platformer entities, but the engine has only \(maxBodies) physics bodies — the extra ones won't move.")
             }
             if !rows.isEmpty {
                 c.line("static const SceneEntity \(sn)_entities[] = {")
