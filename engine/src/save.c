@@ -95,11 +95,11 @@ bool save_apply_pending(void) {
 }
 
 void save_write(int offset, const void *data, int size) {
-    if (offset < 0 || size <= 0 || FREE_START + offset + size > SRAM_SIZE) return;
+    if (offset < 0 || size <= 0 || offset > SRAM_SIZE - FREE_START || size > SRAM_SIZE - FREE_START - offset) return;
     sram_write(FREE_START + offset, data, size);
 }
 
 void save_read(int offset, void *data, int size) {
-    if (offset < 0 || size <= 0 || FREE_START + offset + size > SRAM_SIZE) return;
+    if (offset < 0 || size <= 0 || offset > SRAM_SIZE - FREE_START || size > SRAM_SIZE - FREE_START - offset) return;
     sram_read(FREE_START + offset, data, size);
 }
