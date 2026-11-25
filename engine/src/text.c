@@ -129,7 +129,7 @@ void text_print_centered(int y, const char *s) {
 char *text_itoa(int v, char *buf) {
     char tmp[12];
     int n = 0, neg = v < 0;
-    unsigned u = neg ? (unsigned)(-v) : (unsigned)v;
+    unsigned u = neg ? 0u - (unsigned)v : (unsigned)v;
     do { tmp[n++] = (char)('0' + u % 10); u /= 10; } while (u);
     int i = 0;
     if (neg) buf[i++] = '-';
@@ -141,7 +141,7 @@ char *text_itoa(int v, char *buf) {
 // Fixed 8.8 value as "-1.75"
 char *text_fixed(int v, char *buf) {
     int neg = v < 0;
-    unsigned u = neg ? (unsigned)(-v) : (unsigned)v;
+    unsigned u = neg ? 0u - (unsigned)v : (unsigned)v;
     unsigned whole = u >> 8, frac = ((u & 255) * 100 + 128) >> 8;
     if (frac >= 100) { whole++; frac -= 100; }
     char *p = buf;
