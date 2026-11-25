@@ -8,6 +8,16 @@ static int base_x, base_y;          // camera position before shake
 static Entity *target;
 static int mode;
 static int shake_frames, shake_strength;
+static unsigned shake_rng = 0x2545F491u;   // own xorshift32 state, so shake never advances gameplay rand_int()
+
+// Random offset in [-s, s]
+static int shake_offset(int s) {
+    if (s <= 0) return 0;
+    shake_rng ^= shake_rng << 13;
+    shake_rng ^= shake_rng >> 17;
+    shake_rng ^= shake_rng << 5;
+    return (int)(shake_rng % (unsigned)(2 * s + 1)) - s;
+}
 static int slide_t, slide_fx, slide_fy, slide_tx, slide_ty, slide_dir;
 
 static void clamp_to_scene(int *x, int *y) {
@@ -100,8 +110,8 @@ void camera_update(void) {
     cam_y = base_y;
     if (shake_frames > 0) {
         shake_frames--;
-        cam_x += rand_int(-shake_strength, shake_strength);
-        cam_y += rand_int(-shake_strength, shake_strength);
+        cam_x += shake_offset(shake_strength);
+        cam_y += shake_offset(shake_strength);
     }
 }
 
