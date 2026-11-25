@@ -10,6 +10,8 @@ SCRIPT(Follower) {
     bool bob;         // = true Bob gently up and down while following
     Entity *leader;   // @hide  who it follows: the player, or the follower in front of it
     int phase;        // @hide
+    const EntityTemplate *leaderTmpl;  // @hide  identity of the leader when latched, to spot a reused pool slot
+    int leaderId;     // @hide
 };
 
 // The last one in the line behind the player, so new followers queue up instead of piling on
@@ -32,13 +34,16 @@ static Entity *end_of_line(Entity *player, Entity *self) {
 void Follower_OnTrigger(Follower *self, Entity *e, Entity *other) {
     if (self->leader || !has_tag(other, TAG_Player)) return;
     self->leader = end_of_line(other, e);
+    self->leaderTmpl = self->leader->tmpl;
+    self->leaderId = self->leader->id;
     self->phase = rand_int(0, 255);
 }
 
 void Follower_Update(Follower *self, Entity *e) {
     Entity *lead = self->leader;
     if (!lead) return;
-    if (!lead->alive) { self->leader = NULL; return; }   // leader gone (destroyed): stop here
+    // Leader gone (destroyed), or its pool slot now holds a different entity: stop here
+    if (!lead->alive || lead->tmpl != self->leaderTmpl || lead->id != self->leaderId) { self->leader = NULL; return; }
 
     // Target: `distance` px behind the leader, on the side we're already on
     int lx = ex(lead), ly = ey(lead) + self->height;
