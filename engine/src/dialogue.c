@@ -161,7 +161,7 @@ void dialogue_render_portrait(u16 *oam) {
     if (!active || !portrait || portrait_tile < 0) return;
     int interiorW = (st->boxW - 2) * 8;
     int px = (st->boxX + 1) * 8 + (st->portraitRight ? interiorW - portrait->w - 4 : 4);
-    int py = (st->boxY + 1) * 8 + ((st->boxH - 2) * 8 - portrait->h) / 2;
+    int py = (st->boxY + 1) * 8 + (box_ch * 8 - portrait->h) / 2;
     int f = portrait_current_frame();
     if (f != portrait_shown) { portrait_shown = f; portrait_dirty = 1; }
     oam[0] = (u16)((py & 0xFF) | (portrait->objShape << 14));
@@ -265,7 +265,7 @@ void dialogue_start(DialogueRef d) {
     }
     dma_copy32(CHARBLOCK(DLG_CBB) + FRAME_TILE * 8, st->frameGfx, 9 * 8);
     copy_hud();
-    draw_frame(st->boxX, st->boxY, st->boxW, st->boxH, 0, box_cw);
+    draw_frame(st->boxX, st->boxY, st->boxW, box_ch + 2, 0, box_cw);
     show_box(true);
     input_pressed &= (u16)~(KEY_A | KEY_B);   // the press that started talking shouldn't skip the first page
     start_line();
