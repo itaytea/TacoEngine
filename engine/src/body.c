@@ -83,48 +83,76 @@ static void hitbox(const Entity *e, int *x, int *y, int *w, int *h) {
     }
 }
 
+// Largest sub-step in fixed point: min(collider width, height, 8) pixels (1px with no collider),
+// so a swept box can never skip over a tile-thick wall between two tests.
+static fixed step_size(const Entity *e) {
+    int x, y, w, h;
+    hitbox(e, &x, &y, &w, &h);
+    int s = w < h ? w : h;
+    if (s > 8) s = 8;
+    if (s < 1) s = 1;
+    return (fixed)s << 8;
+}
+
 static int move_x(Entity *e, fixed dx, const Body *b) {
     if (!dx) return 0;
-    int x, y, w, h;
-    e->x += dx;
-    hitbox(e, &x, &y, &w, &h);
-    if (!box_solid(b, x, y, w, h)) return 0;
-    int offset = x - FX_INT(e->x);
-    if (dx > 0) {
-        int nx = (((x + w - 1) >> 4) << 4) - w;
+    fixed step = step_size(e);
+    fixed left = dx;
+    while (left) {
+        fixed d = left;
+        if (d > step) d = step;
+        else if (d < -step) d = -step;
+        left -= d;
+        int x, y, w, h;
+        e->x += d;
+        hitbox(e, &x, &y, &w, &h);
+        if (!box_solid(b, x, y, w, h)) continue;
+        int offset = x - FX_INT(e->x);
+        if (d > 0) {
+            int nx = (((x + w - 1) >> 4) << 4) - w;
+            e->x = (nx - offset) << 8;
+            return HIT_RIGHT;
+        }
+        int nx = ((x >> 4) + 1) << 4;
         e->x = (nx - offset) << 8;
-        return HIT_RIGHT;
+        return HIT_LEFT;
     }
-    int nx = ((x >> 4) + 1) << 4;
-    e->x = (nx - offset) << 8;
-    return HIT_LEFT;
+    return 0;
 }
 
 static int move_y(Entity *e, fixed dy, const Body *b) {
     if (!dy) return 0;
     int x, y, w, h;
     hitbox(e, &x, &y, &w, &h);
-    int oldBottom = y + h;
-    e->y += dy;
-    hitbox(e, &x, &y, &w, &h);
-    int offset = y - FX_INT(e->y);
-    if (box_solid(b, x, y, w, h)) {
-        if (dy > 0) {
-            int ny = (((y + h - 1) >> 4) << 4) - h;
+    int oldBottom = y + h;  // start of the whole sweep: landing checks cover every sub-step
+    fixed step = step_size(e);
+    fixed left = dy;
+    while (left) {
+        fixed d = left;
+        if (d > step) d = step;
+        else if (d < -step) d = -step;
+        left -= d;
+        e->y += d;
+        hitbox(e, &x, &y, &w, &h);
+        int offset = y - FX_INT(e->y);
+        if (box_solid(b, x, y, w, h)) {
+            if (d > 0) {
+                int ny = (((y + h - 1) >> 4) << 4) - h;
+                e->y = (ny - offset) << 8;
+                return HIT_BOTTOM;
+            }
+            int ny = ((y >> 4) + 1) << 4;
             e->y = (ny - offset) << 8;
-            return HIT_BOTTOM;
+            return HIT_TOP;
         }
-        int ny = ((y >> 4) + 1) << 4;
-        e->y = (ny - offset) << 8;
-        return HIT_TOP;
-    }
-    if (dy > 0) {
-        int top = box_lands_oneway(x, oldBottom, y + h, w);
-        int ptop = platform_land(e, x, oldBottom, y + h, w);
-        if (ptop >= 0 && (top < 0 || ptop < top)) top = ptop;
-        if (top >= 0) {
-            e->y = (top - h - offset) << 8;
-            return HIT_BOTTOM;
+        if (d > 0) {
+            int top = box_lands_oneway(x, oldBottom, y + h, w);
+            int ptop = platform_land(e, x, oldBottom, y + h, w);
+            if (ptop >= 0 && (top < 0 || ptop < top)) top = ptop;
+            if (top >= 0) {
+                e->y = (top - h - offset) << 8;
+                return HIT_BOTTOM;
+            }
         }
     }
     return 0;
