@@ -12,5 +12,6 @@ let package = Package(
         .target(name: "EngineKit"),
         .executableTarget(name: "TacoEngine", dependencies: ["EngineKit"]),
         .executableTarget(name: "gbaexport", dependencies: ["EngineKit"]),
+        .testTarget(name: "EngineKitTests", dependencies: ["EngineKit"]),
     ]
 )
