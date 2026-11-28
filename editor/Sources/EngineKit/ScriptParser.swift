@@ -21,6 +21,7 @@ public struct ScriptInfo: Equatable, Sendable, Identifiable {
     public var body: String           // raw field declarations
     public var fields: [ScriptField]
     public var callbacks: Set<String> // Start, Update, OnTrigger, OnTriggerExit, OnMessage, OnDestroy
+    public var warnings: [String] = [] // body lines that look like field declarations but did not parse
     public var id: String { name }
 
     public static let callbackNames = ["Start", "Update", "OnTrigger", "OnTriggerExit", "OnMessage", "OnDestroy"]
@@ -68,26 +69,23 @@ public enum ScriptParser {
         for m in decl.matches(in: code, range: NSRange(location: 0, length: (code as NSString).length)) {
             let name = ns.substring(with: m.range(at: 1))
             let open = m.range.location + m.range.length   // just after '{'
-            guard let close = matchingBrace(ns, from: open) else { continue }
+            guard let close = matchingBrace(code as NSString, from: open) else { continue }
             let body = ns.substring(with: NSRange(location: open, length: close - open))
             let line = ns.substring(to: m.range.location).components(separatedBy: "\n").count
+            let parsed = parseFieldsWithWarnings(body)
             result.append(ScriptInfo(name: name, file: file, line: line, body: body,
-                                     fields: parseFields(body), callbacks: callbacks(in: code, name: name)))
+                                     fields: parsed.fields, callbacks: callbacks(in: code, name: name),
+                                     warnings: parsed.warnings))
         }
         return result
     }
 
+    /// `s` must already have comments blanked out (see withoutComments)
     static func matchingBrace(_ s: NSString, from start: Int) -> Int? {
         var depth = 1, i = start
-        var inLineComment = false, inBlockComment = false
         while i < s.length {
             let c = s.character(at: i)
-            let next: unichar = i + 1 < s.length ? s.character(at: i + 1) : 0
-            if inLineComment { if c == 10 { inLineComment = false } }
-            else if inBlockComment { if c == 42 && next == 47 { inBlockComment = false; i += 1 } }
-            else if c == 47 && next == 47 { inLineComment = true; i += 1 }
-            else if c == 47 && next == 42 { inBlockComment = true; i += 1 }
-            else if c == 123 { depth += 1 }
+            if c == 123 { depth += 1 }
             else if c == 125 { depth -= 1; if depth == 0 { return i } }
             i += 1
         }
@@ -109,6 +107,8 @@ public enum ScriptParser {
     /// Further declarators after a top-level comma: `*p`, `b`, `arr[4]`, `c = 3`
     static let nextDeclRegex = try! NSRegularExpression(
         pattern: #"^\s*(\*+)?\s*([A-Za-z_]\w*)\s*(\[[^\]]*\])?\s*(?:=.*)?$"#)
+    /// Something that looks like `type name ...;` (used to warn when it does not parse)
+    static let declLikeRegex = try! NSRegularExpression(pattern: #"^\s*[A-Za-z_]\w*[\s*].*;\s*$"#)
 
     /// Splits on commas that are not inside (), {} or []
     static func splitTopLevel(_ s: String) -> [String] {
@@ -123,7 +123,12 @@ public enum ScriptParser {
     }
 
     static func parseFields(_ body: String) -> [ScriptField] {
+        parseFieldsWithWarnings(body).fields
+    }
+
+    static func parseFieldsWithWarnings(_ body: String) -> (fields: [ScriptField], warnings: [String]) {
         var fields: [ScriptField] = []
+        var warnings: [String] = []
         for raw in body.components(separatedBy: "\n") {
             var codePart = raw
             var rawComment: String?
@@ -133,6 +138,7 @@ public enum ScriptParser {
             }
             codePart = codePart.trimmingCharacters(in: .whitespaces)
             guard !codePart.isEmpty else { continue }
+            let lineText = raw.trimmingCharacters(in: .whitespaces)
             guard codePart.hasSuffix(";") else { continue }
             let declarators = splitTopLevel(String(codePart.dropLast()))
             func whole(_ s: String) -> NSRange { NSRange(location: 0, length: (s as NSString).length) }
@@ -150,7 +156,12 @@ public enum ScriptParser {
                     parsed.append((nns.substring(with: n.range(at: 2)), n.range(at: 1).location != NSNotFound, n.range(at: 3).location != NSNotFound))
                 }
             }
-            if parsed.isEmpty { continue }
+            if parsed.isEmpty {
+                if declLikeRegex.firstMatch(in: codePart, range: whole(codePart)) != nil {
+                    warnings.append("Could not parse field declaration: \(lineText)")
+                }
+                continue
+            }
             for (name, pointer, array) in parsed {
                 var comment = rawComment?.trimmingCharacters(in: .whitespaces) ?? ""
                 var kind = (pointer || array) ? .hidden : kindOf(ctype)
@@ -179,7 +190,7 @@ public enum ScriptParser {
                 fields.append(ScriptField(name: name, ctype: ctype, kind: kind, defaultValue: def, help: comment))
             }
         }
-        return fields
+        return (fields, warnings)
     }
 
     static func kindOf(_ ctype: String) -> ScriptField.Kind {
